@@ -100,7 +100,12 @@ def test_health_contract_includes_status_and_app(client):
 
 
 def test_main_routers_are_registered():
-    route_paths = {route.path for route in app.routes}
+    route_paths = {
+        path
+        for route in app.routes
+        if (path := getattr(route, "path", None)) is not None
+    }
+    route_paths.update(app.openapi()["paths"])
 
     assert "/api/health" in route_paths
     assert "/api/users/project-owner-candidates" in route_paths
