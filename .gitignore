@@ -1,0 +1,17 @@
+# 依赖 / 构建产物
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 环境与本地配置
+.env
+.env.local
+.env.*.local
+
+# 数据库 / 产物
+*.db
+*.sqlite
+.DS_Store
