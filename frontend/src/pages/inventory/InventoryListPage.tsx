@@ -14,6 +14,7 @@ import { USE_MOCK } from '../../api/runtime'
 import { useAuth } from '../../auth/useAuth'
 import { canManageInventory } from '../../auth/permissions'
 import StatusTag from '../../components/StatusTag'
+import { SketchEmpty } from '../../components/sketch'
 import { CATEGORY_OPTIONS, categoryLabel } from '../../components/status'
 import { inventoryService } from '../../services/inventory'
 import type { BatchStatus, InventoryRow, MaterialCategory } from '../../types'
@@ -127,6 +128,7 @@ export default function InventoryListPage() {
         columns={columns}
         scroll={{ x: 1300 }}
         cardBordered
+        locale={{ emptyText: <SketchEmpty description="暂无试剂库存" /> }}
         options={{ density: true, reload: true, setting: true }}
         pagination={{ defaultPageSize: 10, showSizeChanger: true }}
         search={{ labelWidth: 'auto' }}

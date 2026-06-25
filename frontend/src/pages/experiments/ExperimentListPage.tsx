@@ -19,6 +19,7 @@ import {
   canEditExperiment,
 } from '../../auth/permissions'
 import StatusTag from '../../components/StatusTag'
+import { SketchEmpty } from '../../components/sketch'
 import { useProjectScope } from '../../hooks/useProjectScope'
 import { useUsers } from '../../hooks/useUsers'
 import { experimentService } from '../../services/experiment'
@@ -175,6 +176,7 @@ export default function ExperimentListPage() {
         columns={columns}
         scroll={{ x: 1100 }}
         cardBordered
+        locale={{ emptyText: <SketchEmpty description="暂无实验记录" /> }}
         options={{ density: true, reload: true, setting: true }}
         pagination={{ defaultPageSize: 10, showSizeChanger: true }}
         search={{ labelWidth: 'auto' }}

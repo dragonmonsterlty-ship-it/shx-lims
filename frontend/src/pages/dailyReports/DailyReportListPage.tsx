@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { canCreateReport, canEditReport } from '../../auth/permissions'
 import StatusTag from '../../components/StatusTag'
+import { SketchEmpty } from '../../components/sketch'
 import { useProjectScope } from '../../hooks/useProjectScope'
 import { useUsers } from '../../hooks/useUsers'
 import { dailyReportService } from '../../services/dailyReport'
@@ -177,6 +178,7 @@ export default function DailyReportListPage() {
         columns={columns}
         scroll={{ x: 1200 }}
         cardBordered
+        locale={{ emptyText: <SketchEmpty description="暂无日报" /> }}
         options={{ density: true, reload: true, setting: true }}
         pagination={{ defaultPageSize: 10, showSizeChanger: true }}
         search={{ labelWidth: 'auto' }}

@@ -6,8 +6,52 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { ApiError } from '../../api/errors'
 import { USE_MOCK } from '../../api/runtime'
 import { useAuth } from '../../auth/useAuth'
+import { SketchIcon, type SketchIconName } from '../../components/sketch'
 
 const { Title, Text, Paragraph } = Typography
+
+/** 仅作氛围的角落手账装饰（白名单：登录页背景）。绝不进入登录卡片本身。 */
+const DECORATIONS: Array<{
+  name: SketchIconName
+  size: number
+  color: string
+  opacity: number
+  rotate: number
+  style: React.CSSProperties
+}> = [
+  { name: 'test-tube', size: 84, color: '#2B4C7E', opacity: 0.5, rotate: -12, style: { top: '12%', left: '14%' } },
+  { name: 'flask', size: 100, color: '#4A7C59', opacity: 0.42, rotate: 8, style: { bottom: '12%', left: '10%' } },
+  { name: 'brain-ai', size: 92, color: '#2B4C7E', opacity: 0.46, rotate: 10, style: { top: '14%', right: '13%' } },
+  { name: 'laptop', size: 96, color: '#333', opacity: 0.34, rotate: -6, style: { bottom: '14%', right: '12%' } },
+  { name: 'reagent', size: 64, color: '#4A7C59', opacity: 0.36, rotate: 14, style: { bottom: '30%', right: '26%' } },
+  { name: 'qrcode', size: 60, color: '#333', opacity: 0.3, rotate: -8, style: { top: '34%', left: '26%' } },
+  { name: 'sparkle', size: 40, color: '#C2853B', opacity: 0.6, rotate: 0, style: { top: '24%', left: '46%' } },
+  { name: 'sparkle', size: 30, color: '#2B4C7E', opacity: 0.5, rotate: 0, style: { bottom: '22%', left: '40%' } },
+  { name: 'sparkle', size: 34, color: '#4A7C59', opacity: 0.5, rotate: 0, style: { top: '60%', right: '20%' } },
+]
+
+function LoginDecorations() {
+  return (
+    <div
+      aria-hidden
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}
+    >
+      {DECORATIONS.map((d, i) => (
+        <div
+          key={`${d.name}-${i}`}
+          style={{
+            position: 'absolute',
+            opacity: d.opacity,
+            transform: `rotate(${d.rotate}deg)`,
+            ...d.style,
+          }}
+        >
+          <SketchIcon name={d.name} size={d.size} color={d.color} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 interface LoginValues {
   username: string
@@ -48,15 +92,21 @@ export default function LoginPage() {
   return (
     <div
       style={{
+        position: 'relative',
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--paper)',
+        background: 'transparent',
         padding: 24,
+        overflow: 'hidden',
       }}
     >
-      <Card style={{ width: 380, borderColor: 'var(--line)' }} variant="outlined">
+      <LoginDecorations />
+      <Card
+        style={{ width: 380, borderColor: 'var(--line)', position: 'relative', zIndex: 1 }}
+        variant="outlined"
+      >
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={3} style={{ marginBottom: 4 }}>
             LIMS
