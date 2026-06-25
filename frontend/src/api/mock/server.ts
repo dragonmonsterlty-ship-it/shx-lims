@@ -38,8 +38,6 @@ import type {
   ProjectMember,
   ProjectMemberRole,
 } from '../../types/project'
-import type { Result, ResultReviewQuery, ResultRow } from '../../types/result'
-import type { Sample, SampleListQuery, SampleTestRow, TestMethod } from '../../types/sample'
 import { paginate } from '../pagination'
 import * as db from './db'
 
@@ -671,111 +669,6 @@ export const mockServer = {
     },
   },
 
-  // ---------- samples / methods / results ----------
-  samples: {
-    list(query: SampleListQuery, currentUser: User): Promise<ApiEnvelope<PageResult<Sample>>> {
-      let rows = db.samples.filter((s) => !s.is_deleted)
-      if (currentUser.role === 'operator' || currentUser.role === 'project_manager') {
-        const ids = memberProjectIds(currentUser.id)
-        rows = rows.filter((s) => ids.includes(s.project_id))
-      }
-      if (query.project_id) rows = rows.filter((s) => s.project_id === query.project_id)
-      if (query.status) rows = rows.filter((s) => s.status === query.status)
-      if (query.priority) rows = rows.filter((s) => s.priority === query.priority)
-      rows = rows.filter((s) => match([s.sample_code, s.name, s.compound_name, s.batch_no], query.keyword))
-      return ok(paginate(rows, query.page, query.page_size))
-    },
-    get(id: Id): Promise<ApiEnvelope<Sample>> {
-      const s = db.samples.find((x) => x.id === id && !x.is_deleted)
-      return s ? ok(s) : fail(404, '样品不存在')
-    },
-    tests(sampleId: Id): Promise<ApiEnvelope<SampleTestRow[]>> {
-      const rows: SampleTestRow[] = db.sampleTests
-        .filter((t) => t.sample_id === sampleId)
-        .map((t) => {
-          const method = db.testMethods.find((m) => m.id === t.test_method_id)
-          const result = db.results.find((r) => r.sample_test_id === t.id)
-          return {
-            id: t.id,
-            sample_id: t.sample_id,
-            test_method_id: t.test_method_id,
-            method_code: method?.code ?? '',
-            method_name: method?.name ?? '',
-            unit: method?.unit ?? null,
-            spec_lower: method?.spec_lower ?? null,
-            spec_upper: method?.spec_upper ?? null,
-            spec_text: method?.spec_text ?? null,
-            assigned_to: t.assigned_to ?? null,
-            status: t.status,
-            value_num: result?.value_num ?? null,
-            value_text: result?.value_text ?? null,
-            judgment: result?.judgment ?? null,
-            review_status: result?.review_status ?? null,
-            result_id: result?.id ?? null,
-          }
-        })
-      return ok(rows)
-    },
-  },
-
-  testMethods: {
-    list(): Promise<ApiEnvelope<TestMethod[]>> {
-      return ok(db.testMethods.filter((m) => m.is_active))
-    },
-  },
-
-  results: {
-    reviewList(query: ResultReviewQuery, currentUser: User): Promise<ApiEnvelope<PageResult<ResultRow>>> {
-      const scopedProjects =
-        currentUser.role === 'admin' || currentUser.role === 'director'
-          ? null
-          : managedProjectIds(currentUser.id)
-      let rows: ResultRow[] = db.results.map((r) => {
-        const test = db.sampleTests.find((t) => t.id === r.sample_test_id)
-        const sample = db.samples.find((s) => s.id === test?.sample_id)
-        const method = db.testMethods.find((m) => m.id === test?.test_method_id)
-        return {
-          id: r.id,
-          sample_test_id: r.sample_test_id,
-          sample_id: sample?.id ?? 0,
-          sample_code: sample?.sample_code ?? '',
-          project_id: sample?.project_id ?? 0,
-          method_name: method?.name ?? '',
-          unit: method?.unit ?? null,
-          value_num: r.value_num ?? null,
-          value_text: r.value_text ?? null,
-          judgment: r.judgment ?? null,
-          review_status: r.review_status,
-          status: r.status,
-          result_data: r.result_data,
-          conclusion: r.conclusion ?? null,
-          submitted_by: r.submitted_by ?? r.entered_by ?? null,
-          submitted_at: r.submitted_at ?? r.entered_at ?? null,
-          entered_by: r.entered_by ?? null,
-          entered_at: r.entered_at ?? null,
-        }
-      })
-      if (scopedProjects) rows = rows.filter((r) => scopedProjects.includes(r.project_id))
-      if (query.review_status) rows = rows.filter((r) => r.review_status === query.review_status)
-      if (query.project_id) rows = rows.filter((r) => r.project_id === query.project_id)
-      rows = rows.filter((r) => match([r.sample_code, r.method_name], query.keyword))
-      return ok(paginate(rows, query.page, query.page_size))
-    },
-    review(id: Id, action: 'approve' | 'reject', comment: string | undefined, reviewerId: Id): Promise<ApiEnvelope<Result>> {
-      const r = db.results.find((x) => x.id === id)
-      if (!r) return fail(404, '结果不存在')
-      if (r.entered_by === reviewerId) return fail(403, '录入人不能审核自己的结果')
-      if (action === 'reject' && (!comment || !comment.trim())) {
-        return fail(422, '退回必须填写退回原因')
-      }
-      r.review_status = action === 'approve' ? 'approved' : 'rejected'
-      r.status = action === 'approve' ? 'approved' : 'rejected'
-      r.reviewed_by = reviewerId
-      r.reviewed_at = dayjs().toISOString()
-      r.review_comment = comment ?? null
-      return ok(r)
-    },
-  },
 }
 
 // ---------- internal helpers ----------

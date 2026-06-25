@@ -121,6 +121,37 @@ def test_main_routers_are_registered():
     assert "/api/test-results" in route_paths
 
 
+def test_t1_5_openapi_responses_expose_typed_contracts():
+    openapi = app.openapi()
+    schemas = openapi["components"]["schemas"]
+    expected = {
+        ("/api/samples", "get"): ("SamplePage", {"items", "total", "page", "page_size"}),
+        ("/api/samples/{sample_id}", "get"): (
+            "SampleRead",
+            {"id", "project_id", "sample_no", "name", "status"},
+        ),
+        ("/api/test-methods", "get"): ("TestMethodPage", {"items", "total", "page", "page_size"}),
+        ("/api/test-tasks", "get"): ("TestTaskPage", {"items", "total", "page", "page_size"}),
+        ("/api/test-tasks/{task_id}", "get"): (
+            "TestTaskRead",
+            {"id", "sample_id", "method_id", "assigned_to", "status", "priority", "due_date"},
+        ),
+        ("/api/test-results", "get"): ("TestResultPage", {"items", "total", "page", "page_size"}),
+        ("/api/test-results/{result_id}", "get"): (
+            "TestResultRead",
+            {"id", "task_id", "result_data", "conclusion", "status", "review_comment", "reviewed_by"},
+        ),
+    }
+
+    for (path, method), (data_schema_name, required_fields) in expected.items():
+        response_schema = openapi["paths"][path][method]["responses"]["200"]["content"]["application/json"]["schema"]
+        envelope_name = response_schema["$ref"].rsplit("/", 1)[-1]
+        envelope = schemas[envelope_name]
+        data_ref = envelope["properties"]["data"]["$ref"]
+        assert data_ref.endswith(f"/{data_schema_name}")
+        assert required_fields <= set(schemas[data_schema_name]["properties"])
+
+
 def test_contract_smoke_lists_permissions_and_pagination(client, create_user):
     create_user(username="admin", role="admin", must_change_password=False)
     create_user(username="director", role="director", must_change_password=False)

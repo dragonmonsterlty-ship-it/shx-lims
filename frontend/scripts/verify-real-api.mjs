@@ -309,6 +309,30 @@ const submittedResult = await api(`/test-results/${testResult.id}/submit`, {
   method: 'POST',
 })
 if (submittedResult.status !== 'submitted') throw new Error('T1.5 result was not submitted')
+const rejectedResult = await api(`/test-results/${testResult.id}/reject`, {
+  token: managerLogin.access_token,
+  method: 'POST',
+  body: { comment: 'T1.5 full-stack verification rejected for correction' },
+})
+if (rejectedResult.status !== 'rejected') throw new Error('T1.5 result was not rejected')
+const revisedResult = await api(`/test-results/${testResult.id}`, {
+  token: analystLogin.access_token,
+  method: 'PATCH',
+  body: {
+    result_data: { assay: 99.7, unit: '%' },
+    conclusion: 'Meets specification after correction',
+  },
+})
+if (revisedResult.status !== 'draft' || revisedResult.review_comment !== null) {
+  throw new Error('T1.5 rejected result did not return to a clean draft')
+}
+const resubmittedResult = await api(`/test-results/${testResult.id}/submit`, {
+  token: analystLogin.access_token,
+  method: 'POST',
+})
+if (resubmittedResult.status !== 'submitted') {
+  throw new Error('T1.5 corrected result was not resubmitted')
+}
 const approvedResult = await api(`/test-results/${testResult.id}/approve`, {
   token: managerLogin.access_token,
   method: 'POST',

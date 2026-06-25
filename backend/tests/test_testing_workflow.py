@@ -380,3 +380,78 @@ def test_four_role_permissions_and_cross_project_denials(client, create_user, db
         .one()
     )
     assert membership.role_in_project == "member"
+
+
+def test_closed_result_and_task_cannot_be_modified_or_rolled_back(client, create_user):
+    ctx = setup_users_and_projects(client, create_user)
+    manager_headers = headers(client, "manager_a")
+    analyst_headers = headers(client, "analyst_a")
+    director_headers = headers(client, "director")
+    method = create_method(client, ctx["admin_headers"], "CLOSED-T15")
+    sample = create_sample(client, manager_headers, ctx["project_a"]["id"], "S-CLOSED-T15")
+    task = create_task(client, manager_headers, sample["id"], method["id"], ctx["analyst_a"].id)
+
+    assert client.post(
+        f"/api/test-tasks/{task['id']}/status",
+        headers=director_headers,
+        json={"status": "in_progress"},
+    ).status_code == 403
+    assert client.post(
+        "/api/test-tasks",
+        headers=director_headers,
+        json={
+            "sample_id": sample["id"],
+            "method_id": method["id"],
+            "assigned_to": ctx["analyst_a"].id,
+        },
+    ).status_code == 403
+
+    assert client.post(
+        f"/api/test-tasks/{task['id']}/status",
+        headers=analyst_headers,
+        json={"status": "in_progress"},
+    ).status_code == 200
+    result = client.post(
+        "/api/test-results",
+        headers=analyst_headers,
+        json={"task_id": task["id"], "result_data": {"assay": 99.8}, "conclusion": "Pass"},
+    ).json()["data"]
+    assert client.post(
+        f"/api/test-results/{result['id']}/submit",
+        headers=analyst_headers,
+    ).status_code == 200
+
+    assert client.post(
+        f"/api/test-results/{result['id']}/approve",
+        headers=analyst_headers,
+        json={"comment": "Self approve"},
+    ).status_code == 403
+    assert client.post(
+        f"/api/test-results/{result['id']}/reject",
+        headers=director_headers,
+        json={"comment": "Read-only user"},
+    ).status_code == 403
+
+    approved = client.post(
+        f"/api/test-results/{result['id']}/approve",
+        headers=manager_headers,
+        json={"comment": "Approved"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["data"]["status"] == "approved"
+
+    assert client.patch(
+        f"/api/test-results/{result['id']}",
+        headers=analyst_headers,
+        json={"result_data": {"assay": 100.1}},
+    ).status_code == 400
+    assert client.post(
+        f"/api/test-tasks/{task['id']}/status",
+        headers=analyst_headers,
+        json={"status": "in_progress"},
+    ).status_code == 400
+    assert client.post(
+        f"/api/test-tasks/{task['id']}/status",
+        headers=manager_headers,
+        json={"status": "cancelled"},
+    ).status_code == 400

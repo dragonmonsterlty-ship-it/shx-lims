@@ -13,8 +13,6 @@ import type {
 } from '../../types/experiment'
 import type { InventoryBatch, InventoryTransaction, Material } from '../../types/inventory'
 import type { Project, ProjectMember } from '../../types/project'
-import type { Result } from '../../types/result'
-import type { Sample, SampleTest, TestMethod } from '../../types/sample'
 
 let seq = 1000
 export function nextId(): number {
@@ -186,32 +184,6 @@ export const experimentMaterialUsages: ExperimentMaterialUsage[] = [
   { id: 7402, experiment_id: 601, material_id: 7105, material_code: 'M-SOL-001', material_name: '二氯甲烷', batch_id: 7206, batch_no: 'DCM-2406', usage_role: 'solvent', planned_qty: 100, actual_qty: 100, unit: 'mL', stock_available: 4000, stock_status: 'sufficient', outbound_status: 'dispensed', shortage_qty: null, remark: '' },
   { id: 7403, experiment_id: 602, material_id: 7103, material_code: 'M-RG-001', material_name: '三乙胺', batch_id: 7204, batch_no: 'TEA-2403', usage_role: 'reagent', planned_qty: 10, actual_qty: 12, unit: 'mL', stock_available: 500, stock_status: 'sufficient', outbound_status: 'pending', shortage_qty: null, remark: '待出库' },
   { id: 7404, experiment_id: 602, material_id: 7107, material_code: 'M-CAT-001', material_name: '钯碳 Pd/C', batch_id: 7209, batch_no: 'PdC-2401', usage_role: 'catalyst', planned_qty: 8, actual_qty: 8, unit: 'g', stock_available: 5, stock_status: 'insufficient', outbound_status: 'pending', shortage_qty: null, remark: '库存可能不足' },
-]
-
-// ---- samples / test methods / sample tests / results ----
-export const testMethods: TestMethod[] = [
-  { id: 701, code: 'TM-CONT', name: '含量测定', method: 'HPLC', unit: '%', spec_lower: 98, spec_upper: 102, spec_text: null, is_active: true },
-  { id: 702, code: 'TM-IMP', name: '有关物质', method: 'HPLC', unit: '%', spec_lower: null, spec_upper: 0.5, spec_text: null, is_active: true },
-  { id: 703, code: 'TM-APP', name: '性状', method: '目视', unit: null, spec_lower: null, spec_upper: null, spec_text: '白色粉末', is_active: true },
-]
-
-export const samples: Sample[] = [
-  { id: 501, sample_no: 'PRJ-A-20260601-01', sample_code: 'PRJ-A-20260601-01', project_id: 101, compound_name: '化合物 A', name: 'A-001 含量样', sample_type: '原料', batch_no: 'A-2406', structure_smiles: 'CC(=O)Oc1ccccc1C(=O)O', source: '合成一室', status: 'in_testing', priority: 'normal', received_at: iso(now.subtract(3, 'day')), due_date: day(5), notes: '', is_deleted: false, ...audit(4) },
-  { id: 502, sample_no: 'PRJ-B-20260605-01', sample_code: 'PRJ-B-20260605-01', project_id: 102, compound_name: '原料药 B', name: 'B-003 杂质样', sample_type: '原料', batch_no: 'B-2405', structure_smiles: null, source: '合成二室', status: 'pending_review', priority: 'urgent', received_at: iso(now.subtract(2, 'day')), due_date: day(2), notes: '加急', is_deleted: false, ...audit(5) },
-  { id: 503, sample_no: 'PRJ-A-20260608-01', sample_code: 'PRJ-A-20260608-01', project_id: 101, compound_name: '化合物 A', name: 'A-002 留样', sample_type: '稳定性', batch_no: 'A-2406', structure_smiles: null, source: '稳定性室', status: 'registered', priority: 'normal', received_at: iso(now.subtract(1, 'day')), due_date: day(10), notes: '', is_deleted: false, ...audit(4) },
-]
-
-export const sampleTests: SampleTest[] = [
-  { id: 801, sample_id: 501, test_method_id: 701, assigned_to: 4, status: 'done', ...audit(4) },
-  { id: 802, sample_id: 501, test_method_id: 702, assigned_to: 4, status: 'in_progress', ...audit(4) },
-  { id: 803, sample_id: 502, test_method_id: 701, assigned_to: 5, status: 'done', ...audit(5) },
-  { id: 804, sample_id: 502, test_method_id: 702, assigned_to: 5, status: 'done', ...audit(5) },
-]
-
-export const results: Result[] = [
-  { id: 901, task_id: 801, sample_test_id: 801, result_data: { value: 99.6 }, status: 'submitted', value_num: 99.6, value_text: null, judgment: 'pass', entered_by: 4, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(4) },
-  { id: 902, task_id: 803, sample_test_id: 803, result_data: { value: 101.2 }, status: 'submitted', value_num: 101.2, value_text: null, judgment: 'pass', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
-  { id: 903, task_id: 804, sample_test_id: 804, result_data: { value: 0.82 }, status: 'submitted', value_num: 0.82, value_text: null, judgment: 'oos', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
 ]
 
 export const attachments: Attachment[] = [

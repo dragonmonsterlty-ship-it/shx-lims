@@ -1,8 +1,6 @@
 import { adaptTestResult, type BackendTestResult } from '../api/adapters'
-import { unwrap, USE_MOCK } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
-import { mockServer } from '../api/mock'
 import type {
   Id,
   PageResult,
@@ -17,7 +15,7 @@ export async function listReviewQueue(
   query: ResultReviewQuery,
   currentUser: User,
 ): Promise<PageResult<ResultRow>> {
-  if (USE_MOCK) return unwrap(await mockServer.results.reviewList(query, currentUser))
+  void currentUser
   const result = await request<PageResult<BackendTestResult>>({
     method: 'GET',
     url: endpoints.results.root,
