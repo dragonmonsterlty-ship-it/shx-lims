@@ -56,6 +56,12 @@ def user(db, username: str, full_name: str, role: str, department: str) -> User:
     return created
 
 
+def deactivate_legacy_pm_account(db) -> None:
+    legacy_pm = db.query(User).filter(User.username == "pm").one_or_none()
+    if legacy_pm is not None:
+        legacy_pm.is_active = False
+
+
 def project(db, code: str, name: str, lead: User, created_by: int) -> Project:
     existing = db.query(Project).filter(Project.project_code == code).one_or_none()
     if existing is not None:
@@ -273,22 +279,22 @@ def daily_report(db, owner: User, project_id: int, record_id: int, summary: str)
 
 def seed_database(db) -> None:
     admin = user(db, "admin", "Demo Admin", "admin", "System")
-    director = user(db, "director", "Demo Director", "director", "Management")
-    pm = user(db, "pm", "Demo PM", "project_manager", "Project Office")
-    manager = user(db, "project_manager", "Demo Project Manager", "project_manager", "Chemistry")
+    director = user(db, "director", "演示主管", "director", "Management")
+    manager = user(db, "project_manager", "演示项目负责人", "project_manager", "Chemistry")
+    deactivate_legacy_pm_account(db)
     researcher = user(db, "researcher", "Demo Researcher", "operator", "Chemistry")
     operator = user(db, "operator", "Demo Operator", "operator", "Lab")
     analyst = user(db, "analyst", "Demo Analyst", "operator", "Analytical")
 
     first_project = project(db, "DEMO-001", "Demo Assay Project", manager, admin.id)
-    second_project = project(db, "DEMO-002", "Demo Formulation Project", pm, admin.id)
+    second_project = project(db, "DEMO-002", "Demo Formulation Project", manager, admin.id)
     db.flush()
 
     member(db, first_project.id, manager.id, "manager", admin.id)
     member(db, first_project.id, researcher.id, "member", admin.id)
     member(db, first_project.id, operator.id, "member", admin.id)
     member(db, first_project.id, analyst.id, "member", admin.id)
-    member(db, second_project.id, pm.id, "manager", admin.id)
+    member(db, second_project.id, manager.id, "manager", admin.id)
     member(db, second_project.id, researcher.id, "member", admin.id)
     member(db, second_project.id, operator.id, "member", admin.id)
 

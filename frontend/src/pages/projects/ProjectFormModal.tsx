@@ -138,8 +138,8 @@ export default function ProjectFormModal({
         disabled={lockOwner}
         tooltip={
           lockOwner
-            ? '项目主管新建/编辑项目时，负责人锁定为本人'
-            : '仅项目主管及以上角色可担任；保存后自动登记为项目 manager'
+            ? '项目负责人新建/编辑项目时，负责人锁定为本人'
+            : '仅项目负责人及以上角色可担任；保存后自动登记为项目 manager'
         }
         rules={[{ required: true, message: '请选择项目负责人' }]}
         request={async () => {

@@ -38,7 +38,7 @@
 | GET | /users/me | — | `User` | |
 | GET | /users | — | `User[]` | **后端缺列表端点**，mock 提供；选人/姓名解析依赖 |
 
-`Role = admin | director | project_manager | operator`。
+`Role = admin | director | project_manager | operator`，中文分别显示为系统管理员、主管、项目负责人、操作员；演示账号仅使用 `project_manager`，历史角色值 `pm` 仍归一为 `project_manager`。
 
 ## 2. Projects（`src/services/project.ts`）
 

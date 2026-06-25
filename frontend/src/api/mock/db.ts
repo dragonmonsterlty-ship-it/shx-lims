@@ -38,8 +38,8 @@ function audit(actor = 1) {
 // ---- users（四角色 + 额外操作员） ----
 export const users: User[] = [
   { id: 1, username: 'admin', full_name: '系统管理员', email: 'admin@lims.dev', role: 'admin', department: '信息科', is_active: true, must_change_password: false },
-  { id: 2, username: 'director', full_name: '王主任', email: 'director@lims.dev', role: 'director', department: '研发中心', is_active: true, must_change_password: false },
-  { id: 3, username: 'pm', full_name: '张项目', email: 'pm@lims.dev', role: 'project_manager', department: '分析一组', is_active: true, must_change_password: false },
+  { id: 2, username: 'director', full_name: '王主管', email: 'director@lims.dev', role: 'director', department: '研发中心', is_active: true, must_change_password: false },
+  { id: 3, username: 'project_manager', full_name: '张负责人', email: 'project_manager@lims.dev', role: 'project_manager', department: '分析一组', is_active: true, must_change_password: false },
   { id: 4, username: 'op', full_name: '李操作', email: 'op@lims.dev', role: 'operator', department: '分析一组', is_active: true, must_change_password: true },
   { id: 5, username: 'op2', full_name: '赵操作', email: 'op2@lims.dev', role: 'operator', department: '分析二组', is_active: true, must_change_password: false },
 ]
@@ -52,27 +52,27 @@ export const projects: Project[] = [
   { id: 104, project_code: 'PRJ-D', name: 'D 小试路线开发', project_type: '小试路线', lead_user_id: 3, status: 'completed', description: 'D 化合物小试合成路线', start_date: day(-120), end_date: day(-10), is_deleted: false, ...audit() },
 ]
 
-// 约定：每个项目的 manager 成员即其负责人（owner，admin/director/pm）；
+// 约定：每个项目的 manager 成员即其负责人（owner，admin/director/project_manager）；
 // operator 仅作为 member（项目组员）。下面安排 2-3 个 operator 分布在不同项目。
 export const projectMembers: ProjectMember[] = [
-  // PRJ-A (owner 张项目 pm=3)
+  // PRJ-A (owner 张负责人 project_manager=3)
   { id: 201, project_id: 101, user_id: 3, role_in_project: 'manager', ...audit() },
   { id: 202, project_id: 101, user_id: 4, role_in_project: 'member', ...audit() }, // 李操作
   { id: 203, project_id: 101, user_id: 5, role_in_project: 'member', ...audit() }, // 赵操作
-  // PRJ-B (owner 王主任 director=2)
+  // PRJ-B (owner 王主管 director=2)
   { id: 204, project_id: 102, user_id: 2, role_in_project: 'manager', ...audit() },
   { id: 205, project_id: 102, user_id: 4, role_in_project: 'member', ...audit() }, // 李操作
   // PRJ-C (owner 系统管理员 admin=1)
   { id: 206, project_id: 103, user_id: 1, role_in_project: 'manager', ...audit() },
   { id: 207, project_id: 103, user_id: 5, role_in_project: 'member', ...audit() }, // 赵操作
-  // PRJ-D (owner 张项目 pm=3)
+  // PRJ-D (owner 张负责人 project_manager=3)
   { id: 208, project_id: 104, user_id: 3, role_in_project: 'manager', ...audit() },
   { id: 209, project_id: 104, user_id: 4, role_in_project: 'member', ...audit() }, // 李操作
   { id: 210, project_id: 104, user_id: 5, role_in_project: 'member', ...audit() }, // 赵操作
 ]
 
 // ---- daily reports（工作日报，复用项目/成员/实验记录）----
-// 用户: 1 admin / 2 director / 3 pm张 / 4 op李 / 5 op赵
+// 用户: 1 admin / 2 director / 3 project_manager张 / 4 op李 / 5 op赵
 function reviewed(actorId: number, daysAgo: number) {
   return { submitted_at: iso(now.subtract(daysAgo + 1, 'day')), reviewed_by: actorId, reviewed_at: iso(now.subtract(daysAgo, 'day')) }
 }
@@ -101,7 +101,7 @@ export const dailyReportActivities: DailyReportActivity[] = [
 ]
 
 // ---- experiments（实验记录，复用 T0.7 项目/用户/成员关系）----
-// 项目: 101(pm3; 成员 4,5) 102(director2; 成员 4) 103(admin1; 成员 5) 104(pm3; 成员 4,5)
+// 项目: 101(project_manager=3; 成员 4,5) 102(director=2; 成员 4) 103(admin=1; 成员 5) 104(project_manager=3; 成员 4,5)
 export const experiments: Experiment[] = [
   { id: 601, project_id: 101, experiment_no: 'EXP-A-001', title: 'A-001 强制降解试验', lead_user_id: 4, participant_ids: [5], status: 'reviewed', plan_start_date: day(-20), plan_end_date: day(-10), objective: '考察 A-001 在酸碱氧化条件下的稳定性。', steps: '1. 配制酸/碱/氧化体系；\n2. 分别放置取样；\n3. HPLC 监测降解产物。', result_summary: '氧化条件下产生主要降解杂质，含量下降约 3%。', is_deleted: false, ...audit(4) },
   { id: 602, project_id: 101, experiment_no: 'EXP-A-002', title: 'A 含量方法学验证', lead_user_id: 3, participant_ids: [4, 5], status: 'in_progress', plan_start_date: day(-5), plan_end_date: day(5), objective: '验证 HPLC 含量测定方法的专属性、线性、精密度。', steps: '1. 专属性；\n2. 线性与范围；\n3. 重复性与中间精密度。', result_summary: '', is_deleted: false, ...audit(3) },

@@ -146,13 +146,13 @@ export default function LoginPage() {
             { u: 'admin', label: '管理员' },
             ...(USE_MOCK
               ? [
-                  { u: 'director', label: '主任' },
-                  { u: 'pm', label: '项目主管' },
+                  { u: 'director', label: '主管' },
+                  { u: 'project_manager', label: '项目负责人' },
                   { u: 'op', label: '操作员' },
                 ]
               : [
-                  { u: 'pm', label: '项目负责人' },
-                  { u: 'project_manager', label: '项目主管' },
+                  { u: 'director', label: '主管' },
+                  { u: 'project_manager', label: '项目负责人' },
                   { u: 'operator', label: '操作员' },
                 ]),
           ].map((item) => (

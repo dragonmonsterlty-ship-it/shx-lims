@@ -1,6 +1,7 @@
 # 权限矩阵（PERMISSION_MATRIX）
 
 > 四级角色：`admin` / `director` / `project_manager` / `operator`。
+> 中文名称：系统管理员 / 主管 / 项目负责人 / 操作员。演示登录只提供 `project_manager`；`pm` 仅作为历史角色值兼容别名。
 > 前端仅做菜单/按钮显隐与可见性判断（`src/auth/permissions.ts`）；**范围权限以后端行级过滤为唯一真相**。
 > 「本项目」= project_manager 作为负责人(manager)的项目；「参与项目」= 作为成员的项目。
 

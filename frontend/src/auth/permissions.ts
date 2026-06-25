@@ -3,8 +3,8 @@ import type { DailyReport, Experiment, Id, Project, Role, User } from '../types'
 /** 角色中文标签（operator 显示为「操作员」，值仍为 operator）。 */
 export const roleLabel: Record<Role, string> = {
   admin: '系统管理员',
-  director: '主任',
-  project_manager: '项目主管',
+  director: '主管',
+  project_manager: '项目负责人',
   operator: '操作员',
 }
 

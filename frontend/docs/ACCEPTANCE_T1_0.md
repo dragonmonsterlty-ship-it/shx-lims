@@ -19,8 +19,8 @@ npm run build
 | 用户名 | 角色 | 姓名 |
 |---|---|---|
 | admin | admin | 系统管理员 |
-| director | director | 王主任 |
-| pm | project_manager | 张项目 |
+| director | director | 王主管 |
+| project_manager | project_manager | 张负责人 |
 | op | operator | 李操作（首登提示 banner） |
 | op2 | operator | 赵操作 |
 
@@ -29,7 +29,7 @@ npm run build
 ## 3. 各角色验收路径
 
 - **admin/director**：可见全部项目/实验/日报/库存；可新建项目、确认日报、库存入库/调整/冻结、确认出库。
-- **project_manager(pm 张项目)**：仅见所属项目(PRJ-A/B/D)；仅 PRJ-A/PRJ-D 可编辑（本人负责）；可确认本负责项目下成员日报与实验出库；库存只读。
+- **project_manager（张负责人）**：仅见所属项目(PRJ-A/B/D)；仅 PRJ-A/PRJ-D 可编辑（本人负责）；可确认本负责项目下成员日报与实验出库；库存只读。
 - **operator(op 李操作)**：仅见本人参与项目与本人相关实验/日报；可填写实验物料使用但不可确认出库；库存只读；无新建/编辑项目。
 
 ## 4. 验收项

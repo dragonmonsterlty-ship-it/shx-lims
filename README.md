@@ -43,7 +43,7 @@ Copy-Item .env.example frontend\.env
 ## 测试账号（demo seed,默认密码 `password123`）
 
 标准角色为 `admin` / `director` / `project_manager` / `operator`。
-兼容用户名 `pm`、`researcher`、`analyst` 仍保留用于演示，但角色已归一。
+中文名称分别为“系统管理员”/“主管”/“项目负责人”/“操作员”。演示账号使用规范用户名 `project_manager`；历史角色值 `pm` 仍可归一为 `project_manager`，但不再单独提供 `pm` 演示账号。
 
 ## 手动命令（不走脚本时）
 

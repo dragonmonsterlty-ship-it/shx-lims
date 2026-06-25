@@ -1,7 +1,7 @@
 import type { AuditFields, Id } from './common'
 import type { User } from './auth'
 
-// 工作日报（T0.9）：组员每日提交，主管/主任/admin 查看、确认、退回。
+// 工作日报（T0.9）：组员每日提交，项目负责人/主管/admin 查看、确认、退回。
 // 取代早期的 daily_log 占位，复用项目/成员与实验记录关系。
 
 export type DailyReportStatus =
