@@ -14,7 +14,11 @@ import type {
   InventoryTransaction,
   Material,
   Project,
+  Result,
+  ResultRow,
   Role,
+  Sample,
+  TestTask,
   User,
 } from '../types'
 
@@ -222,6 +226,69 @@ export interface BackendInventoryTransaction {
   shortage_qty?: number | string | null
 }
 
+export interface BackendSample {
+  id: Id
+  project_id: Id
+  sample_no: string
+  sample_code: string
+  name: string
+  type?: string | null
+  sample_type?: string | null
+  source?: string | null
+  batch_no?: string | null
+  amount?: number | string | null
+  unit?: string | null
+  storage_condition?: string | null
+  status: string
+  priority: string
+  received_at?: string | null
+  due_date?: string | null
+  notes?: string | null
+  is_deleted: boolean
+  created_by?: Id | null
+  created_at?: string
+  updated_by?: Id | null
+  updated_at?: string | null
+}
+
+export interface BackendTestTask {
+  id: Id
+  sample_id: Id
+  method_id: Id
+  test_method_id: Id
+  assigned_to?: Id | null
+  status: string
+  priority: string
+  due_date?: string | null
+  sample: { id: Id; project_id: Id; sample_no: string; name: string; status: string }
+  method: { id: Id; code: string; name: string; category?: string | null; version?: string | null }
+  result_id?: Id | null
+  result_status?: string | null
+  created_by?: Id | null
+  created_at?: string
+  updated_by?: Id | null
+  updated_at?: string | null
+}
+
+export interface BackendTestResult {
+  id: Id
+  task_id: Id
+  sample_test_id: Id
+  result_data: unknown
+  conclusion?: string | null
+  status: string
+  submitted_by?: Id | null
+  submitted_at?: string | null
+  reviewed_by?: Id | null
+  reviewed_at?: string | null
+  review_comment?: string | null
+  task: BackendTestTask
+  created_by?: Id | null
+  created_at?: string
+  updated_by?: Id | null
+  updated_at?: string | null
+}
+
 const toNumber = (value: number | string | null | undefined): number =>
   value == null ? 0 : Number(value)
 
@@ -258,6 +325,86 @@ export function adaptProject(raw: BackendProject): Project {
     remark: raw.remark ?? null,
     member_count: raw.member_count ?? 0,
     is_deleted: raw.is_deleted ?? false,
+    created_by: raw.created_by ?? null,
+    created_at: raw.created_at,
+    updated_by: raw.updated_by ?? null,
+    updated_at: raw.updated_at ?? null,
+  }
+}
+
+export function adaptSample(raw: BackendSample): Sample {
+  return {
+    id: raw.id,
+    project_id: raw.project_id,
+    sample_no: raw.sample_no,
+    sample_code: raw.sample_code,
+    name: raw.name,
+    compound_name: raw.name,
+    type: raw.type ?? raw.sample_type ?? null,
+    sample_type: raw.sample_type ?? raw.type ?? null,
+    source: raw.source ?? null,
+    batch_no: raw.batch_no ?? null,
+    amount: raw.amount == null ? null : Number(raw.amount),
+    unit: raw.unit ?? null,
+    storage_condition: raw.storage_condition ?? null,
+    status: raw.status as Sample['status'],
+    priority: raw.priority as Sample['priority'],
+    received_at: raw.received_at ?? null,
+    due_date: raw.due_date ?? null,
+    notes: raw.notes ?? null,
+    is_deleted: raw.is_deleted,
+    created_by: raw.created_by ?? null,
+    created_at: raw.created_at,
+    updated_by: raw.updated_by ?? null,
+    updated_at: raw.updated_at ?? null,
+  }
+}
+
+export function adaptTestTask(raw: BackendTestTask): TestTask {
+  return {
+    id: raw.id,
+    sample_id: raw.sample_id,
+    method_id: raw.method_id,
+    test_method_id: raw.test_method_id,
+    assigned_to: raw.assigned_to ?? null,
+    status: raw.status as TestTask['status'],
+    priority: raw.priority,
+    due_date: raw.due_date ?? null,
+    sample: { ...raw.sample, status: raw.sample.status as Sample['status'] },
+    method: raw.method,
+    method_code: raw.method.code,
+    method_name: raw.method.name,
+    result_id: raw.result_id ?? null,
+    result_status: (raw.result_status as TestTask['result_status']) ?? null,
+    review_status: (raw.result_status as TestTask['review_status']) ?? null,
+    created_by: raw.created_by ?? null,
+    created_at: raw.created_at,
+    updated_by: raw.updated_by ?? null,
+    updated_at: raw.updated_at ?? null,
+  }
+}
+
+export function adaptTestResult(raw: BackendTestResult): Result & ResultRow {
+  const task = adaptTestTask(raw.task)
+  return {
+    id: raw.id,
+    task_id: raw.task_id,
+    sample_test_id: raw.sample_test_id,
+    sample_id: task.sample_id,
+    sample_code: task.sample.sample_no,
+    project_id: task.sample.project_id,
+    method_name: task.method_name,
+    result_data: raw.result_data,
+    conclusion: raw.conclusion ?? null,
+    status: raw.status as Result['status'],
+    review_status: raw.status as ResultRow['review_status'],
+    submitted_by: raw.submitted_by ?? null,
+    submitted_at: raw.submitted_at ?? null,
+    reviewed_by: raw.reviewed_by ?? null,
+    reviewed_at: raw.reviewed_at ?? null,
+    review_comment: raw.review_comment ?? null,
+    entered_by: raw.created_by ?? null,
+    entered_at: raw.created_at ?? null,
     created_by: raw.created_by ?? null,
     created_at: raw.created_at,
     updated_by: raw.updated_by ?? null,

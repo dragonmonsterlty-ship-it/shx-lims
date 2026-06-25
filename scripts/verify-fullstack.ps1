@@ -41,7 +41,7 @@ foreach ($p in @('/projects?page=1&page_size=5','/experiment-records?page=1&page
   if ($null -eq $r.data.items) { throw "List response has no items: $p" }
   Write-Host ("  OK {0} total={1}" -f $p, $r.data.total)
 }
-Write-Host '== T1.4 real business flow =='
+Write-Host '== T1.4 and T1.5 real business flows =='
 Push-Location (Join-Path $root 'frontend')
 try {
   $env:VITE_API_BASE_URL = $base

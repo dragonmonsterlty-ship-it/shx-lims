@@ -50,6 +50,27 @@ export const endpoints = {
     archive: (id: number) => `/experiment-records/${id}/archive`,
     dispense: (id: number) => `/experiment-records/${id}/dispense`,
   },
-  samples: { root: '/samples', detail: (id: number) => `/samples/${id}`, tests: (id: number) => `/samples/${id}/tests` },
-  results: { root: '/results', review: (id: number) => `/results/${id}/review` },
+  samples: {
+    root: '/samples',
+    detail: (id: number) => `/samples/${id}`,
+    status: (id: number) => `/samples/${id}/status`,
+  },
+  testMethods: {
+    root: '/test-methods',
+    detail: (id: number) => `/test-methods/${id}`,
+    activation: (id: number) => `/test-methods/${id}/activation`,
+  },
+  testTasks: {
+    root: '/test-tasks',
+    detail: (id: number) => `/test-tasks/${id}`,
+    assignee: (id: number) => `/test-tasks/${id}/assignee`,
+    status: (id: number) => `/test-tasks/${id}/status`,
+  },
+  results: {
+    root: '/test-results',
+    detail: (id: number) => `/test-results/${id}`,
+    submit: (id: number) => `/test-results/${id}/submit`,
+    approve: (id: number) => `/test-results/${id}/approve`,
+    reject: (id: number) => `/test-results/${id}/reject`,
+  },
 } as const

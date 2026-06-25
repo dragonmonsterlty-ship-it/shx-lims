@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import attachments, auth, daily_logs, daily_reports, experiment_records, health, projects, reagents, users
+from app.api import attachments, auth, daily_logs, daily_reports, experiment_records, health, projects, reagents, testing, users
 
 
 api_router = APIRouter()
@@ -15,3 +15,7 @@ api_router.include_router(attachments.router, prefix="/attachments", tags=["atta
 api_router.include_router(reagents.reagents_router, prefix="/reagents", tags=["reagents"])
 api_router.include_router(reagents.reagent_lots_router, prefix="/reagent-lots", tags=["reagent_lots"])
 api_router.include_router(reagents.inventory_txns_router, prefix="/inventory-transactions", tags=["inventory_transactions"])
+api_router.include_router(testing.samples_router, prefix="/samples", tags=["samples"])
+api_router.include_router(testing.methods_router, prefix="/test-methods", tags=["test_methods"])
+api_router.include_router(testing.tasks_router, prefix="/test-tasks", tags=["test_tasks"])
+api_router.include_router(testing.results_router, prefix="/test-results", tags=["test_results"])

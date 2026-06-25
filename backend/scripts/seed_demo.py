@@ -22,6 +22,9 @@ from app.models.business import (  # noqa: E402
     ProjectMember,
     Reagent,
     ReagentLot,
+    Sample,
+    SampleTest,
+    TestMethod,
     ExperimentRecordParticipant,
 )
 from app.models.user import User  # noqa: E402
@@ -277,6 +280,70 @@ def daily_report(db, owner: User, project_id: int, record_id: int, summary: str)
     db.add(report)
 
 
+def testing_workflow(db, project_item: Project, analyst: User, admin: User) -> None:
+    method = db.query(TestMethod).filter(TestMethod.code == "HPLC-DEMO-T15").one_or_none()
+    if method is None:
+        method = TestMethod(
+            code="HPLC-DEMO-T15",
+            name="Demo HPLC Assay",
+            category="assay",
+            version="1.0",
+            description="T1.5 demo method",
+            method="assay",
+            is_active=True,
+            created_by=admin.id,
+        )
+        db.add(method)
+        db.flush()
+    else:
+        method.is_active = True
+
+    sample = db.query(Sample).filter(Sample.sample_code == "DEMO-SAMPLE-T15").one_or_none()
+    if sample is None:
+        sample = Sample(
+            sample_code="DEMO-SAMPLE-T15",
+            project_id=project_item.id,
+            compound_name="Demo compound",
+            name="T1.5 demo assay sample",
+            sample_type="compound",
+            source="demo seed",
+            batch_no="DEMO-BATCH-T15",
+            amount=Decimal("10.0000"),
+            unit="mg",
+            storage_condition="2-8 C",
+            status="in_testing",
+            priority="normal",
+            created_by=admin.id,
+        )
+        db.add(sample)
+        db.flush()
+    else:
+        sample.is_deleted = False
+        sample.project_id = project_item.id
+
+    task = (
+        db.query(SampleTest)
+        .filter(SampleTest.sample_id == sample.id, SampleTest.test_method_id == method.id)
+        .one_or_none()
+    )
+    if task is None:
+        task = SampleTest(
+            sample_id=sample.id,
+            test_method_id=method.id,
+            assigned_to=analyst.id,
+            status="pending",
+            priority="normal",
+            created_by=admin.id,
+        )
+        db.add(task)
+    else:
+        task.assigned_to = analyst.id
+        if task.result is None:
+            task.status = "pending"
+    if task.result is not None and task.result.status not in {"approved", "rejected", "submitted", "draft"}:
+        task.result.status = "draft"
+
+
 def seed_database(db) -> None:
     admin = user(db, "admin", "Demo Admin", "admin", "System")
     director = user(db, "director", "演示主管", "director", "Management")
@@ -312,6 +379,7 @@ def seed_database(db) -> None:
     db.flush()
     daily_report(db, researcher, first_project.id, first_record.id, "Demo daily report for assay project")
     daily_report(db, operator, second_project.id, second_record.id, "Demo daily report for formulation project")
+    testing_workflow(db, first_project, analyst, admin)
     db.commit()
 
 

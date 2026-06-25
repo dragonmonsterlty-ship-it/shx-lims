@@ -746,6 +746,11 @@ export const mockServer = {
           value_text: r.value_text ?? null,
           judgment: r.judgment ?? null,
           review_status: r.review_status,
+          status: r.status,
+          result_data: r.result_data,
+          conclusion: r.conclusion ?? null,
+          submitted_by: r.submitted_by ?? r.entered_by ?? null,
+          submitted_at: r.submitted_at ?? r.entered_at ?? null,
           entered_by: r.entered_by ?? null,
           entered_at: r.entered_at ?? null,
         }
@@ -764,6 +769,7 @@ export const mockServer = {
         return fail(422, '退回必须填写退回原因')
       }
       r.review_status = action === 'approve' ? 'approved' : 'rejected'
+      r.status = action === 'approve' ? 'approved' : 'rejected'
       r.reviewed_by = reviewerId
       r.reviewed_at = dayjs().toISOString()
       r.review_comment = comment ?? null

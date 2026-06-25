@@ -49,6 +49,16 @@ def test_data_model_tables_are_registered():
     assert Base.metadata.tables["project_member"].constraints
     assert Base.metadata.tables["sample_test"].constraints
     assert Base.metadata.tables["result"].c.sample_test_id.unique is True
+    assert {"amount", "unit", "storage_condition"}.issubset(Base.metadata.tables["sample"].c.keys())
+    assert {"category", "version", "description"}.issubset(Base.metadata.tables["test_method"].c.keys())
+    assert {"priority", "due_date"}.issubset(Base.metadata.tables["sample_test"].c.keys())
+    assert {
+        "result_data",
+        "conclusion",
+        "status",
+        "submitted_by",
+        "submitted_at",
+    }.issubset(Base.metadata.tables["result"].c.keys())
 
 
 def test_data_model_minimal_insert_graph(db_session, create_user):

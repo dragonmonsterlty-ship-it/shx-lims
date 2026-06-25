@@ -98,10 +98,12 @@ if (!lots.items.length) throw new Error('reagent-lots list is empty; run backend
 
 const managerLogin = await loginAs('project_manager')
 const operatorLogin = await loginAs('operator')
+const analystLogin = await loginAs('analyst')
 const directorLogin = await loginAs('director')
 for (const [name, session] of [
   ['project_manager', managerLogin],
   ['operator', operatorLogin],
+  ['analyst', analystLogin],
   ['director', directorLogin],
 ]) {
   if (!session.access_token) throw new Error(`${name} login response has no access_token`)
@@ -120,6 +122,8 @@ const projectMembers = await api(`/projects/${project.id}/members`, {
 })
 const operator = projectMembers.find((member) => member.user?.username === 'operator')?.user
 if (!operator) throw new Error('managed project has no operator member')
+const analyst = projectMembers.find((member) => member.user?.username === 'analyst')?.user
+if (!analyst) throw new Error('managed project has no analyst member')
 
 const lot = lots.items[0]
 const suffix = `${Date.now()}`
@@ -245,6 +249,78 @@ const confirmedReport = await api(`/daily-reports/${report.id}/review`, {
 })
 if (confirmedReport.status !== 'confirmed') throw new Error('daily report was not confirmed')
 
+const method = await api('/test-methods', {
+  token,
+  method: 'POST',
+  body: {
+    code: `TM-T15-${suffix}`,
+    name: 'T1.5 verification assay',
+    category: 'assay',
+    version: '1.0',
+    description: 'Created by full-stack verification',
+  },
+})
+const sample = await api('/samples', {
+  token: managerLogin.access_token,
+  method: 'POST',
+  body: {
+    project_id: project.id,
+    sample_no: `S-T15-${suffix}`,
+    name: 'T1.5 verification sample',
+    type: 'compound',
+    source: 'full-stack smoke',
+    batch_no: `B-${suffix}`,
+    amount: '10.0000',
+    unit: 'mg',
+    storage_condition: '2-8 C',
+  },
+})
+await expectHttp('/samples', 403, {
+  token: directorLogin.access_token,
+  method: 'POST',
+  body: { project_id: project.id, sample_no: `DENIED-${suffix}`, name: 'Denied' },
+})
+const task = await api('/test-tasks', {
+  token: managerLogin.access_token,
+  method: 'POST',
+  body: {
+    sample_id: sample.id,
+    method_id: method.id,
+    assigned_to: analyst.id,
+    priority: 'high',
+  },
+})
+await api(`/test-tasks/${task.id}/status`, {
+  token: analystLogin.access_token,
+  method: 'POST',
+  body: { status: 'in_progress' },
+})
+const testResult = await api('/test-results', {
+  token: analystLogin.access_token,
+  method: 'POST',
+  body: {
+    task_id: task.id,
+    result_data: { assay: 99.5, unit: '%' },
+    conclusion: 'Meets specification',
+  },
+})
+const submittedResult = await api(`/test-results/${testResult.id}/submit`, {
+  token: analystLogin.access_token,
+  method: 'POST',
+})
+if (submittedResult.status !== 'submitted') throw new Error('T1.5 result was not submitted')
+const approvedResult = await api(`/test-results/${testResult.id}/approve`, {
+  token: managerLogin.access_token,
+  method: 'POST',
+  body: { comment: 'T1.5 full-stack verification approved' },
+})
+if (approvedResult.status !== 'approved') throw new Error('T1.5 result was not approved')
+const completedTask = await api(`/test-tasks/${task.id}`, { token: analystLogin.access_token })
+const completedSample = await api(`/samples/${sample.id}`, { token: managerLogin.access_token })
+if (completedTask.status !== 'completed' || completedSample.status !== 'completed') {
+  throw new Error('T1.5 task/sample did not complete after approval')
+}
+
 console.log(
   JSON.stringify(
     {
@@ -260,6 +336,10 @@ console.log(
       real_flow_experiment: createdExperiment.id,
       real_flow_report: report.id,
       real_flow_outbound: dispensedExperiment.reagent_usages[0]?.outbound_status,
+      t1_5_sample: sample.id,
+      t1_5_task: task.id,
+      t1_5_result: approvedResult.id,
+      t1_5_status: approvedResult.status,
     },
     null,
     2,

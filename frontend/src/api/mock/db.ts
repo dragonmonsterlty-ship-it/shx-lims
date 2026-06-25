@@ -196,9 +196,9 @@ export const testMethods: TestMethod[] = [
 ]
 
 export const samples: Sample[] = [
-  { id: 501, sample_code: 'PRJ-A-20260601-01', project_id: 101, compound_name: '化合物 A', name: 'A-001 含量样', sample_type: '原料', batch_no: 'A-2406', structure_smiles: 'CC(=O)Oc1ccccc1C(=O)O', source: '合成一室', status: 'in_testing', priority: 'normal', received_at: iso(now.subtract(3, 'day')), due_date: day(5), notes: '', is_deleted: false, ...audit(4) },
-  { id: 502, sample_code: 'PRJ-B-20260605-01', project_id: 102, compound_name: '原料药 B', name: 'B-003 杂质样', sample_type: '原料', batch_no: 'B-2405', structure_smiles: null, source: '合成二室', status: 'pending_review', priority: 'urgent', received_at: iso(now.subtract(2, 'day')), due_date: day(2), notes: '加急', is_deleted: false, ...audit(5) },
-  { id: 503, sample_code: 'PRJ-A-20260608-01', project_id: 101, compound_name: '化合物 A', name: 'A-002 留样', sample_type: '稳定性', batch_no: 'A-2406', structure_smiles: null, source: '稳定性室', status: 'registered', priority: 'normal', received_at: iso(now.subtract(1, 'day')), due_date: day(10), notes: '', is_deleted: false, ...audit(4) },
+  { id: 501, sample_no: 'PRJ-A-20260601-01', sample_code: 'PRJ-A-20260601-01', project_id: 101, compound_name: '化合物 A', name: 'A-001 含量样', sample_type: '原料', batch_no: 'A-2406', structure_smiles: 'CC(=O)Oc1ccccc1C(=O)O', source: '合成一室', status: 'in_testing', priority: 'normal', received_at: iso(now.subtract(3, 'day')), due_date: day(5), notes: '', is_deleted: false, ...audit(4) },
+  { id: 502, sample_no: 'PRJ-B-20260605-01', sample_code: 'PRJ-B-20260605-01', project_id: 102, compound_name: '原料药 B', name: 'B-003 杂质样', sample_type: '原料', batch_no: 'B-2405', structure_smiles: null, source: '合成二室', status: 'pending_review', priority: 'urgent', received_at: iso(now.subtract(2, 'day')), due_date: day(2), notes: '加急', is_deleted: false, ...audit(5) },
+  { id: 503, sample_no: 'PRJ-A-20260608-01', sample_code: 'PRJ-A-20260608-01', project_id: 101, compound_name: '化合物 A', name: 'A-002 留样', sample_type: '稳定性', batch_no: 'A-2406', structure_smiles: null, source: '稳定性室', status: 'registered', priority: 'normal', received_at: iso(now.subtract(1, 'day')), due_date: day(10), notes: '', is_deleted: false, ...audit(4) },
 ]
 
 export const sampleTests: SampleTest[] = [
@@ -209,9 +209,9 @@ export const sampleTests: SampleTest[] = [
 ]
 
 export const results: Result[] = [
-  { id: 901, sample_test_id: 801, value_num: 99.6, value_text: null, judgment: 'pass', entered_by: 4, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(4) },
-  { id: 902, sample_test_id: 803, value_num: 101.2, value_text: null, judgment: 'pass', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
-  { id: 903, sample_test_id: 804, value_num: 0.82, value_text: null, judgment: 'oos', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
+  { id: 901, task_id: 801, sample_test_id: 801, result_data: { value: 99.6 }, status: 'submitted', value_num: 99.6, value_text: null, judgment: 'pass', entered_by: 4, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(4) },
+  { id: 902, task_id: 803, sample_test_id: 803, result_data: { value: 101.2 }, status: 'submitted', value_num: 101.2, value_text: null, judgment: 'pass', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
+  { id: 903, task_id: 804, sample_test_id: 804, result_data: { value: 0.82 }, status: 'submitted', value_num: 0.82, value_text: null, judgment: 'oos', entered_by: 5, entered_at: iso(now.subtract(1, 'day')), review_status: 'pending', reviewed_by: null, reviewed_at: null, review_comment: null, ...audit(5) },
 ]
 
 export const attachments: Attachment[] = [

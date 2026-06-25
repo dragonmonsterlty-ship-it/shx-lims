@@ -1,4 +1,5 @@
 import type { DailyReport, Experiment, Id, Project, Role, User } from '../types'
+import type { ResultStatus, TaskStatus } from '../types'
 
 /** 角色中文标签（operator 显示为「操作员」，值仍为 operator）。 */
 export const roleLabel: Record<Role, string> = {
@@ -123,6 +124,39 @@ export function canDispenseMaterials(
 /** 手动入库/调整/冻结/新增批次：admin / director。 */
 export function canManageInventory(role: Role): boolean {
   return role === 'admin' || role === 'director'
+}
+
+// ---------- 样品 / 检测 / 结果权限 ----------
+
+export function canManageSample(
+  user: Pick<User, 'id' | 'role'>,
+  projectId: Id,
+  scope: ProjectScope,
+): boolean {
+  if (user.role === 'admin') return true
+  return user.role === 'project_manager' && scope.managed.has(projectId)
+}
+
+export function canExecuteTestTask(
+  user: Pick<User, 'id' | 'role'>,
+  task: { assigned_to?: Id | null; status: TaskStatus | string },
+): boolean {
+  return (
+    user.role === 'operator' &&
+    task.assigned_to === user.id &&
+    ['pending', 'in_progress'].includes(task.status)
+  )
+}
+
+export function canReviewTestResult(
+  user: Pick<User, 'id' | 'role'>,
+  projectId: Id,
+  resultStatus: ResultStatus,
+  scope: ProjectScope,
+): boolean {
+  if (resultStatus !== 'submitted') return false
+  if (user.role === 'admin') return true
+  return user.role === 'project_manager' && scope.managed.has(projectId)
 }
 
 // ---------- 日报权限 ----------

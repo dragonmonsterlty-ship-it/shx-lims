@@ -115,6 +115,10 @@ def test_main_routers_are_registered():
     assert "/api/inventory-transactions" in route_paths
     assert "/api/experiment-records" in route_paths
     assert "/api/daily-reports" in route_paths
+    assert "/api/samples" in route_paths
+    assert "/api/test-methods" in route_paths
+    assert "/api/test-tasks" in route_paths
+    assert "/api/test-results" in route_paths
 
 
 def test_contract_smoke_lists_permissions_and_pagination(client, create_user):

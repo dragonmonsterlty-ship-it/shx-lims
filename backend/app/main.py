@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -29,7 +30,7 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
-        content=api_response({"errors": exc.errors()}, message="Validation error", code=422),
+        content=api_response({"errors": jsonable_encoder(exc.errors())}, message="Validation error", code=422),
     )
 
 

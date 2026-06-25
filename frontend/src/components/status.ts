@@ -31,6 +31,8 @@ const MAPS: Record<StatusKind, Record<string, StatusMeta>> = {
     pending: { color: 'default', label: '待检' },
     in_progress: { color: 'blue', label: '检测中' },
     done: { color: 'green', label: '已出结果' },
+    completed: { color: 'green', label: '已完成' },
+    cancelled: { color: 'red', label: '已取消' },
   },
   daily_report: {
     draft: { color: 'default', label: '草稿' },
@@ -47,6 +49,8 @@ const MAPS: Record<StatusKind, Record<string, StatusMeta>> = {
   },
   review: {
     pending: { color: 'orange', label: '待审' },
+    draft: { color: 'default', label: '草稿' },
+    submitted: { color: 'orange', label: '已提交' },
     approved: { color: 'green', label: '通过' },
     rejected: { color: 'red', label: '退回' },
   },

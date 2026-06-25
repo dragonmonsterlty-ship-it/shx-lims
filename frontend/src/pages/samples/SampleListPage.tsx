@@ -5,17 +5,20 @@ import {
   type ProColumns,
 } from '@ant-design/pro-components'
 import { useQuery } from '@tanstack/react-query'
-import { Alert } from 'antd'
+import { Alert, Button, Popconfirm } from 'antd'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../auth/useAuth'
+import { canManageSample } from '../../auth/permissions'
 import StatusTag from '../../components/StatusTag'
 import { SketchEmpty } from '../../components/sketch'
 import { projectService } from '../../services/project'
 import { sampleService } from '../../services/sample'
+import { useProjectScope } from '../../hooks/useProjectScope'
 import type { Id, Sample, SamplePriority, SampleStatus } from '../../types'
 import { formatDate, formatDateTime } from '../../utils/format'
+import SampleFormModal from './SampleFormModal'
 
 interface SampleParams {
   keyword?: string
@@ -42,6 +45,7 @@ export default function SampleListPage() {
   const navigate = useNavigate()
   const actionRef = useRef<ActionType>(null)
   const [loadError, setLoadError] = useState<string>()
+  const { scope } = useProjectScope(user)
 
   const projectsQuery = useQuery({
     queryKey: ['projects', 'scope-options', user?.id],
@@ -130,6 +134,28 @@ export default function SampleListPage() {
         <a key="view" onClick={() => navigate(`/samples/${row.id}`)}>
           查看
         </a>,
+        canManageSample(user, row.project_id, scope) ? (
+          <SampleFormModal
+            key="edit"
+            mode="edit"
+            currentUser={user}
+            sample={row}
+            onSaved={() => actionRef.current?.reload()}
+            trigger={<a>编辑</a>}
+          />
+        ) : null,
+        canManageSample(user, row.project_id, scope) && row.status !== 'cancelled' ? (
+          <Popconfirm
+            key="cancel"
+            title="确认作废该样品？"
+            onConfirm={async () => {
+              await sampleService.changeSampleStatus(row.id, 'cancelled')
+              actionRef.current?.reload()
+            }}
+          >
+            <a>作废</a>
+          </Popconfirm>
+        ) : null,
       ],
     },
   ]
@@ -156,6 +182,19 @@ export default function SampleListPage() {
         options={{ density: true, reload: true, setting: true }}
         pagination={{ defaultPageSize: 10, showSizeChanger: true }}
         search={{ labelWidth: 'auto' }}
+        toolBarRender={() =>
+          ['admin', 'project_manager'].includes(user.role)
+            ? [
+                <SampleFormModal
+                  key="create"
+                  mode="create"
+                  currentUser={user}
+                  onSaved={() => actionRef.current?.reload()}
+                  trigger={<Button type="primary">新建样品</Button>}
+                />,
+              ]
+            : []
+        }
         request={async (params) => {
           try {
             setLoadError(undefined)

@@ -6,6 +6,9 @@ import {
   adaptInventoryTransaction,
   adaptProject,
   adaptReagentLot,
+  adaptSample,
+  adaptTestResult,
+  adaptTestTask,
   adaptUser,
   normalizeRole,
   toBackendExperimentCreate,
@@ -407,5 +410,79 @@ describe('backend adapters', () => {
     )
 
     expect(result.row.status).toBe('low')
+  })
+
+  it('maps the T1.5 sample contract without mock-only field drift', () => {
+    expect(
+      adaptSample({
+        id: 51,
+        project_id: 3,
+        sample_no: 'S-051',
+        sample_code: 'S-051',
+        name: 'Assay sample',
+        type: 'compound',
+        sample_type: 'compound',
+        amount: '10.5000',
+        unit: 'mg',
+        status: 'registered',
+        priority: 'normal',
+        is_deleted: false,
+        created_at: '2026-06-25T00:00:00Z',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: 51,
+        sample_no: 'S-051',
+        sample_code: 'S-051',
+        type: 'compound',
+        amount: 10.5,
+      }),
+    )
+  })
+
+  it('maps nested T1.5 task and result summaries', () => {
+    const task = adaptTestTask({
+      id: 61,
+      sample_id: 51,
+      method_id: 7,
+      test_method_id: 7,
+      assigned_to: 9,
+      status: 'in_progress',
+      priority: 'high',
+      sample: { id: 51, project_id: 3, sample_no: 'S-051', name: 'Assay sample', status: 'in_testing' },
+      method: { id: 7, code: 'HPLC', name: 'Assay', category: 'assay', version: '1.0' },
+      result_id: 71,
+      result_status: 'submitted',
+      created_at: '2026-06-25T00:00:00Z',
+    })
+    const result = adaptTestResult({
+      id: 71,
+      task_id: 61,
+      sample_test_id: 61,
+      result_data: { assay: 99.4 },
+      conclusion: 'Pass',
+      status: 'submitted',
+      submitted_by: 9,
+      task: {
+        id: 61,
+        sample_id: 51,
+        method_id: 7,
+        test_method_id: 7,
+        assigned_to: 9,
+        status: 'in_progress',
+        priority: 'high',
+        sample: { id: 51, project_id: 3, sample_no: 'S-051', name: 'Assay sample', status: 'pending_review' },
+        method: { id: 7, code: 'HPLC', name: 'Assay' },
+        result_id: 71,
+        result_status: 'submitted',
+        created_at: '2026-06-25T00:00:00Z',
+      },
+      created_at: '2026-06-25T00:00:00Z',
+    })
+
+    expect(task.method_name).toBe('Assay')
+    expect(task.review_status).toBe('submitted')
+    expect(result.sample_code).toBe('S-051')
+    expect(result.review_status).toBe('submitted')
   })
 })
