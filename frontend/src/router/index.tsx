@@ -18,6 +18,7 @@ const DailyReportDetailPage = lazy(() => import('../pages/dailyReports/DailyRepo
 const InventoryListPage = lazy(() => import('../pages/inventory/InventoryListPage'))
 const InventoryDetailPage = lazy(() => import('../pages/inventory/InventoryDetailPage'))
 const SampleListPage = lazy(() => import('../pages/samples/SampleListPage'))
+const SampleDetailPage = lazy(() => import('../pages/samples/SampleDetailPage'))
 const TestingReviewPage = lazy(() => import('../pages/testing/TestingReviewPage'))
 const AdminPage = lazy(() => import('../pages/admin/AdminPage'))
 const ForbiddenPage = lazy(() => import('../pages/error/ForbiddenPage'))
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: 'inventory', element: withSuspense(<InventoryListPage />) },
           { path: 'inventory/:id', element: withSuspense(<InventoryDetailPage />) },
           { path: 'samples', element: withSuspense(<SampleListPage />) },
+          { path: 'samples/:id', element: withSuspense(<SampleDetailPage />) },
           { path: 'testing', element: withSuspense(<TestingReviewPage />) },
           {
             element: <RoleGuard allow={['admin']} />,
