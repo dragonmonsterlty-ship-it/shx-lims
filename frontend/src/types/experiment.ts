@@ -5,13 +5,10 @@ import type { AuditFields, Id } from './common'
 
 export type ExperimentStatus =
   | 'draft'
-  | 'planned'
   | 'in_progress'
   | 'submitted'
   | 'reviewed'
   | 'archived'
-  | 'completed'
-  | 'cancelled'
 
 export interface Experiment extends AuditFields {
   id: Id
@@ -112,6 +109,9 @@ export interface ExperimentInput {
   /** 前端为多行文本；若后续为结构化数组，写入时拼为后端 procedure 文本。 */
   steps?: string | string[] | null
   result_summary?: string | null
+  conclusion?: string | null
+  next_step?: string | null
+  risk_note?: string | null
   material_usages?: MaterialUsageInput[]
 }
 

@@ -76,3 +76,9 @@ def archive_experiment_record(record_id: int, db: DbSession, current_user: Curre
     record = record_service.archive_record(db, current_user, record_id)
     detail = record_service.serialize_record_detail(record)
     return api_response(ExperimentRecordDetail.model_validate(detail).model_dump())
+
+
+@router.post("/{record_id}/dispense")
+def dispense_experiment_record(record_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    record = record_service.dispense_record(db, current_user, record_id)
+    return api_response(ExperimentRecordDetail.model_validate(record_service.serialize_record_detail(record)).model_dump())

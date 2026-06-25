@@ -51,7 +51,7 @@ def list_daily_reports(
 @router.get("/{report_id}")
 def read_daily_report(report_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     report = report_service.get_report_or_404(db, report_id)
-    report_service.ensure_can_view_report(current_user, report)
+    report_service.ensure_can_view_report(db, current_user, report)
     detail = report_service.serialize_report_detail(report)
     return api_response(DailyReportDetail.model_validate(detail).model_dump())
 

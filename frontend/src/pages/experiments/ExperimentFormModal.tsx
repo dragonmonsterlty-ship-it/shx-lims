@@ -50,6 +50,9 @@ interface FormValues {
   objective?: string
   steps?: string
   result_summary?: string
+  conclusion?: string
+  next_step?: string
+  risk_note?: string
 }
 
 interface UsageRow {
@@ -64,10 +67,10 @@ interface UsageRow {
 
 const STATUS_OPTIONS = [
   { label: '草稿', value: 'draft' },
-  { label: '计划中', value: 'planned' },
   { label: '进行中', value: 'in_progress' },
-  { label: '已完成', value: 'completed' },
-  { label: '已取消', value: 'cancelled' },
+  { label: '已提交', value: 'submitted' },
+  { label: '已审核', value: 'reviewed' },
+  { label: '已归档', value: 'archived' },
 ]
 
 export default function ExperimentFormModal({
@@ -141,6 +144,9 @@ export default function ExperimentFormModal({
           objective: experiment.objective ?? undefined,
           steps: experiment.steps ?? undefined,
           result_summary: experiment.result_summary ?? undefined,
+          conclusion: experiment.conclusion ?? undefined,
+          next_step: experiment.next_step ?? undefined,
+          risk_note: experiment.risk_note ?? undefined,
         }
       : { title: '', status: 'draft', participant_ids: [], lead_user_id: isOperator ? currentUser.id : undefined }
 
@@ -238,6 +244,9 @@ export default function ExperimentFormModal({
           objective: values.objective ?? null,
           steps: values.steps ?? null,
           result_summary: values.result_summary ?? null,
+          conclusion: values.conclusion ?? null,
+          next_step: values.next_step ?? null,
+          risk_note: values.risk_note ?? null,
           material_usages,
         }
         try {
@@ -307,6 +316,9 @@ export default function ExperimentFormModal({
       <ProFormTextArea name="objective" label="实验目的" fieldProps={{ rows: 2 }} />
       <ProFormTextArea name="steps" label="实验步骤" fieldProps={{ rows: 4 }} />
       <ProFormTextArea name="result_summary" label="结果摘要" fieldProps={{ rows: 2 }} />
+      <ProFormTextArea name="conclusion" label="实验结论" fieldProps={{ rows: 2 }} />
+      <ProFormTextArea name="next_step" label="下一步" fieldProps={{ rows: 2 }} />
+      <ProFormTextArea name="risk_note" label="风险备注" fieldProps={{ rows: 2 }} />
 
       <Divider orientation="left" plain>
         物料使用（保存不扣库存；出库在详情页确认）

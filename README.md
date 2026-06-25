@@ -42,8 +42,8 @@ Copy-Item .env.example frontend\.env
 
 ## 测试账号（demo seed,默认密码 `password123`）
 
-`admin` / `director` / `pm` / `project_manager` / `researcher` / `operator` / `analyst`
-> 后端角色词表(如 `pm`、`researcher`)由前端适配层归一为四级角色 `admin/director/project_manager/operator`。
+标准角色为 `admin` / `director` / `project_manager` / `operator`。
+兼容用户名 `pm`、`researcher`、`analyst` 仍保留用于演示，但角色已归一。
 
 ## 手动命令（不走脚本时）
 
@@ -65,5 +65,6 @@ npm run dev
 ## 非阻塞遗留（见 docs/INTEGRATION_BASELINE.md 与各模块说明）
 
 - 附件真实上传、出库扣减/dispense、8 类物料、AI 日报、周报统计:未实现(mock-only 或后续)。
-- 实验 `participant_ids`、`conclusion/next_step/risk_note` 写入;日报多条 items 录入 UI:未做(写入层已支持多条)。
-- 后端角色词表统一(`pm` 与 `project_manager` 并存)与实验状态词表(`submitted/archived`):前端已容错,建议后端侧统一。
+- T1.4 已完成实验扩展字段、日报多条 items UI、确认出库和实验来源库存流水。
+- T1.4 词表、接口和权限见 `docs/T1.4_BUSINESS_FLOWS.md`。
+- 附件对象存储、样品/检测/结果审核、AI 日报与周报统计留待 T1.5+。

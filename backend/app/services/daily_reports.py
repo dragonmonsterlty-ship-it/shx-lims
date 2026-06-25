@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import Select, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.business import DailyReport, DailyReportAttachment, DailyReportItem, ExperimentRecord, Project
+from app.models.business import DailyReport, DailyReportAttachment, DailyReportItem, ExperimentRecord, Project, ProjectMember
 from app.models.user import User
 from app.schemas.daily_report import (
     DAILY_REPORT_REVIEW_ROLES,
@@ -50,22 +50,57 @@ def get_report_or_404(db: Session, report_id: int) -> DailyReport:
     return report
 
 
-def ensure_can_view_report(user: User, report: DailyReport) -> None:
-    if is_review_role(user) or report.user_id == user.id:
+def report_project_ids(report: DailyReport) -> set[int]:
+    return {item.project_id for item in report.items if item.project_id is not None}
+
+
+def manages_any_report_project(db: Session, user: User, report: DailyReport) -> bool:
+    project_ids = report_project_ids(report)
+    if not project_ids:
+        return False
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    ProjectMember.user_id == user.id,
+                    ProjectMember.role_in_project == "manager",
+                    ProjectMember.project_id.in_(project_ids),
+                )
+            )
+        )
+    )
+
+
+def ensure_can_view_report(db: Session, user: User, report: DailyReport) -> None:
+    if user.role in {"admin", "director"} or report.user_id == user.id:
+        return
+    if user.role == "project_manager" and manages_any_report_project(db, user, report):
         return
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily report not found")
 
 
 def filter_reports_for_user(stmt: Select[tuple[DailyReport]], user: User) -> Select[tuple[DailyReport]]:
-    if is_review_role(user):
+    if user.role in {"admin", "director"}:
         return stmt
+    if user.role == "project_manager":
+        managed_ids = select(ProjectMember.project_id).where(
+            ProjectMember.user_id == user.id,
+            ProjectMember.role_in_project == "manager",
+        )
+        return stmt.where(
+            or_(
+                DailyReport.user_id == user.id,
+                exists().where(
+                    DailyReportItem.daily_report_id == DailyReport.id,
+                    DailyReportItem.project_id.in_(managed_ids),
+                ),
+            )
+        )
     return stmt.where(DailyReport.user_id == user.id)
 
 
 def ensure_can_create_for_user(current_user: User, user_id: int) -> None:
     if current_user.id == user_id:
-        return
-    if current_user.role in {"admin", "pm", "project_manager"}:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only create own daily report")
 
@@ -78,16 +113,18 @@ def ensure_can_modify_report(current_user: User, report: DailyReport) -> None:
 
 
 def ensure_can_submit_report(current_user: User, report: DailyReport) -> None:
-    if current_user.id == report.user_id or current_user.role in {"admin", "pm", "project_manager"}:
+    if current_user.id == report.user_id:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Daily report submit permission required")
 
 
-def ensure_can_review_report(current_user: User, report: DailyReport) -> None:
+def ensure_can_review_report(db: Session, current_user: User, report: DailyReport) -> None:
     if not is_review_role(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Daily report review permission required")
     if current_user.id == report.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Reporter cannot review own daily report")
+    if current_user.role == "project_manager" and not manages_any_report_project(db, current_user, report):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily report not found")
 
 
 def validate_user(db: Session, user_id: int) -> None:
@@ -210,7 +247,7 @@ def create_report(db: Session, current_user: User, payload: DailyReportCreate) -
 
 def update_report(db: Session, current_user: User, report_id: int, payload: DailyReportUpdate) -> DailyReport:
     report = get_report_or_404(db, report_id)
-    ensure_can_view_report(current_user, report)
+    ensure_can_view_report(db, current_user, report)
     ensure_can_modify_report(current_user, report)
     updates = payload.model_dump(exclude_unset=True)
     items = updates.pop("items", None)
@@ -228,7 +265,7 @@ def update_report(db: Session, current_user: User, report_id: int, payload: Dail
 
 def submit_report(db: Session, current_user: User, report_id: int) -> DailyReport:
     report = get_report_or_404(db, report_id)
-    ensure_can_view_report(current_user, report)
+    ensure_can_view_report(db, current_user, report)
     ensure_can_submit_report(current_user, report)
     if report.status not in {"draft", "returned"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only draft or returned daily reports can be submitted")
@@ -241,11 +278,11 @@ def submit_report(db: Session, current_user: User, report_id: int) -> DailyRepor
 
 def review_report(db: Session, current_user: User, report_id: int, payload: DailyReportReview) -> DailyReport:
     report = get_report_or_404(db, report_id)
-    ensure_can_view_report(current_user, report)
-    ensure_can_review_report(current_user, report)
+    ensure_can_view_report(db, current_user, report)
+    ensure_can_review_report(db, current_user, report)
     if report.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted daily reports can be reviewed")
-    report.status = "reviewed"
+    report.status = "confirmed"
     report.reviewer_id = current_user.id
     report.reviewed_at = datetime.now(UTC)
     report.review_comment = payload.review_comment
@@ -256,8 +293,8 @@ def review_report(db: Session, current_user: User, report_id: int, payload: Dail
 
 def return_report(db: Session, current_user: User, report_id: int, payload: DailyReportReturn) -> DailyReport:
     report = get_report_or_404(db, report_id)
-    ensure_can_view_report(current_user, report)
-    ensure_can_review_report(current_user, report)
+    ensure_can_view_report(db, current_user, report)
+    ensure_can_review_report(db, current_user, report)
     if report.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted daily reports can be returned")
     report.status = "returned"
@@ -270,15 +307,8 @@ def return_report(db: Session, current_user: User, report_id: int, payload: Dail
 
 
 def archive_report(db: Session, current_user: User, report_id: int) -> DailyReport:
-    report = get_report_or_404(db, report_id)
-    ensure_can_view_report(current_user, report)
-    ensure_can_review_report(current_user, report)
-    if report.status not in {"reviewed", "returned", "submitted"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted, reviewed, or returned daily reports can be archived")
-    report.status = "archived"
-    report.updated_by = current_user.id
-    db.commit()
-    return get_report_or_404(db, report.id)
+    _ = (db, current_user, report_id)
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Daily report archive is not part of T1.4 status flow")
 
 
 def experiment_record_brief(record: ExperimentRecord | None) -> dict | None:

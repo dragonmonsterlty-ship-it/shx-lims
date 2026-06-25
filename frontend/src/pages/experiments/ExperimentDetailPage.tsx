@@ -72,7 +72,7 @@ export default function ExperimentDetailPage() {
 
   const usages = usagesQuery.data ?? []
   const hasPending = usages.some((u) => u.outbound_status === 'pending')
-  const canDispense = USE_MOCK && !!exp && !!user && canDispenseMaterials(user, exp, scope)
+  const canDispense = !!exp && !!user && canDispenseMaterials(user, exp, scope)
 
   const handleDispense = async () => {
     if (!exp || !user) return
@@ -153,7 +153,7 @@ export default function ExperimentDetailPage() {
       onBack={() => navigate('/experiments')}
       tags={exp ? <StatusTag kind="experiment" value={exp.status} /> : undefined}
       extra={
-        USE_MOCK && exp && user && canEditExperiment(user, exp, scope)
+        exp && user && canEditExperiment(user, exp, scope)
           ? [
               <ExperimentFormModal
                 key="edit"
@@ -214,6 +214,17 @@ export default function ExperimentDetailPage() {
                 key: 'result',
                 label: '结果摘要',
                 children: <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{exp.result_summary || '—'}</Paragraph>,
+              },
+              {
+                key: 'conclusion',
+                label: '结论与后续',
+                children: (
+                  <Descriptions bordered column={1} size="small">
+                    <Descriptions.Item label="实验结论">{exp.conclusion || '—'}</Descriptions.Item>
+                    <Descriptions.Item label="下一步">{exp.next_step || '—'}</Descriptions.Item>
+                    <Descriptions.Item label="风险备注">{exp.risk_note || '—'}</Descriptions.Item>
+                  </Descriptions>
+                ),
               },
               {
                 key: 'materials',

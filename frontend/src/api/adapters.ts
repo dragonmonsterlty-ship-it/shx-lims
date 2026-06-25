@@ -96,6 +96,9 @@ export interface BackendExperimentUsage {
   unit?: string | null
   purpose?: string | null
   remark?: string | null
+  outbound_status?: ExperimentMaterialUsage['outbound_status']
+  shortage_qty?: number | string | null
+  stock_available?: number | string | null
 }
 
 export interface BackendAttachment {
@@ -136,6 +139,7 @@ export interface BackendExperiment {
   reagent_usages?: BackendExperimentUsage[]
   attachments?: BackendAttachment[]
   created_at?: string
+  participant_ids?: Id[]
 }
 
 export interface BackendDailyReportItem {
@@ -213,6 +217,9 @@ export interface BackendInventoryTransaction {
   reference?: string | null
   operator_id?: Id | null
   txn_at: string
+  source_type?: 'manual' | 'experiment'
+  source_id?: Id | null
+  shortage_qty?: number | string | null
 }
 
 const toNumber = (value: number | string | null | undefined): number =>
@@ -293,10 +300,15 @@ function adaptExperimentUsage(raw: BackendExperimentUsage): ExperimentMaterialUs
     planned_qty: quantity,
     actual_qty: quantity,
     unit: raw.unit ?? null,
-    stock_available: null,
-    stock_status: 'no_stock_link',
-    outbound_status: 'pending',
-    shortage_qty: null,
+    stock_available: raw.stock_available == null ? null : toNumber(raw.stock_available),
+    stock_status:
+      raw.lot_id == null
+        ? 'no_stock_link'
+        : raw.outbound_status === 'insufficient'
+          ? 'insufficient'
+          : 'sufficient',
+    outbound_status: raw.outbound_status ?? 'pending',
+    shortage_qty: raw.shortage_qty == null ? null : toNumber(raw.shortage_qty),
     remark: raw.remark ?? raw.purpose ?? null,
   }
 }
@@ -312,7 +324,7 @@ export function adaptExperiment(raw: BackendExperiment): Experiment {
     title: raw.title,
     record_type: raw.record_type,
     lead_user_id: leadId,
-    participant_ids: [],
+    participant_ids: raw.participant_ids ?? [],
     status: raw.status as Experiment['status'],
     experiment_date: raw.experiment_date ?? null,
     plan_start_date: raw.experiment_date ?? null,
@@ -346,7 +358,7 @@ export function adaptDailyReport(raw: BackendDailyReport): DailyReport {
     work_content: raw.summary ?? firstItem?.content ?? '',
     issues_risks: raw.issues ?? firstItem?.problem_note ?? null,
     next_plan: raw.next_plan ?? firstItem?.next_step ?? null,
-    status: raw.status as DailyReport['status'],
+    status: (raw.status === 'reviewed' ? 'confirmed' : raw.status) as DailyReport['status'],
     submitted_at: raw.submitted_at ?? null,
     reviewed_by: raw.reviewer_id ?? null,
     reviewed_at: raw.reviewed_at ?? null,
@@ -450,8 +462,8 @@ export function adaptInventoryTransaction(
     transaction_type: transactionType,
     qty_delta: raw.txn_type === 'out' ? -Math.abs(quantity) : quantity,
     unit: '',
-    source_type: 'manual',
-    source_id: null,
+    source_type: raw.source_type ?? 'manual',
+    source_id: raw.source_id ?? null,
     actor_id: raw.operator_id ?? null,
     at: raw.txn_at,
     reason: raw.reference ?? null,
@@ -483,12 +495,26 @@ export interface BackendExperimentCreatePayload {
   objective?: string | null
   procedure?: string | null
   result_summary?: string | null
+  conclusion?: string | null
+  next_step?: string | null
+  risk_note?: string | null
+  participant_ids: Id[]
+  reagent_usages: Record<string, unknown>[]
+}
+
+function toBackendExperimentUsages(input: ExperimentInput['material_usages']): Record<string, unknown>[] {
+  return (input ?? []).map((usage) => ({
+    lot_id: usage.batch_id ?? null,
+    quantity: usage.actual_qty ?? usage.planned_qty ?? null,
+    purpose: usage.usage_role,
+    remark: usage.remark ?? null,
+  }))
 }
 
 /**
  * 创建实验记录映射：
  * - experiment_no → code（为空时按时间戳生成，避免空）
- * - lead_user_id → owner_id（参与人 participant_ids 不写入后端）
+ * - lead_user_id → owner_id；participant_ids 写入参与人关联表
  * - 计划起/止日期 → 单一 experiment_date（取起始优先）
  * - steps（文本/数组）→ procedure 文本
  * - record_type 缺省取安全默认值 'other'
@@ -505,10 +531,15 @@ export function toBackendExperimentCreate(input: ExperimentInput): BackendExperi
     objective: input.objective ?? null,
     procedure: stepsToProcedure(input.steps),
     result_summary: input.result_summary ?? null,
+    conclusion: input.conclusion ?? null,
+    next_step: input.next_step ?? null,
+    risk_note: input.risk_note ?? null,
+    participant_ids: input.participant_ids ?? [],
+    reagent_usages: toBackendExperimentUsages(input.material_usages),
   }
 }
 
-/** 更新实验记录映射：仅包含传入字段（PATCH 语义），participant_ids 不写入。 */
+/** 更新实验记录映射：仅包含传入字段（PATCH 语义）。 */
 export function toBackendExperimentUpdate(
   input: Partial<ExperimentInput>,
 ): Record<string, unknown> {
@@ -524,6 +555,11 @@ export function toBackendExperimentUpdate(
   if (input.objective !== undefined) out.objective = input.objective
   if (input.steps !== undefined) out.procedure = stepsToProcedure(input.steps)
   if (input.result_summary !== undefined) out.result_summary = input.result_summary
+  if (input.conclusion !== undefined) out.conclusion = input.conclusion
+  if (input.next_step !== undefined) out.next_step = input.next_step
+  if (input.risk_note !== undefined) out.risk_note = input.risk_note
+  if (input.participant_ids !== undefined) out.participant_ids = input.participant_ids
+  if (input.material_usages !== undefined) out.reagent_usages = toBackendExperimentUsages(input.material_usages)
   return out
 }
 
@@ -631,9 +667,9 @@ export function toBackendDailyReportCreate(input: DailyReportInput): Record<stri
   const items = input.items?.length ? input.items.map(buildDailyReportItem) : flatToDailyReportItems(input)
   return {
     report_date: input.report_date,
-    summary: input.work_content ?? null,
-    issues: input.issues_risks ?? null,
-    next_plan: input.next_plan ?? null,
+    summary: input.work_content ?? input.items?.[0]?.content ?? null,
+    issues: input.issues_risks ?? input.items?.[0]?.problem_note ?? null,
+    next_plan: input.next_plan ?? input.items?.[0]?.next_step ?? null,
     items,
   }
 }
@@ -647,6 +683,9 @@ export function toBackendDailyReportUpdate(input: Partial<DailyReportInput>): Re
   if (input.next_plan !== undefined) out.next_plan = input.next_plan
   if (input.items !== undefined) {
     out.items = input.items.map(buildDailyReportItem)
+    out.summary = input.items[0]?.content ?? null
+    out.issues = input.items[0]?.problem_note ?? null
+    out.next_plan = input.items[0]?.next_step ?? null
   } else if (
     input.work_content !== undefined ||
     input.project_id !== undefined ||

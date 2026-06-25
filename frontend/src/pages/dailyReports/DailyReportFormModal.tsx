@@ -1,7 +1,7 @@
 import {
   ModalForm,
   ProFormDatePicker,
-  ProFormDependency,
+  ProFormList,
   ProFormSelect,
   ProFormText,
   ProFormTextArea,
@@ -15,7 +15,7 @@ import type { ApiError } from '../../api/errors'
 import { dailyReportService } from '../../services/dailyReport'
 import { experimentService } from '../../services/experiment'
 import { projectService } from '../../services/project'
-import type { DailyReport, DailyReportInput, Id, User } from '../../types'
+import type { DailyReport, DailyReportInput, DailyReportItemInput, User } from '../../types'
 
 interface DailyReportFormModalProps {
   mode: 'create' | 'edit'
@@ -27,11 +27,7 @@ interface DailyReportFormModalProps {
 
 interface FormValues {
   report_date: string
-  project_id?: Id
-  related_experiment_id?: Id
-  work_content: string
-  issues_risks?: string
-  next_plan?: string
+  items: DailyReportItemInput[]
 }
 
 export default function DailyReportFormModal({
@@ -49,22 +45,29 @@ export default function DailyReportFormModal({
     isEdit && report
       ? {
           report_date: report.report_date,
-          project_id: report.project_id ?? undefined,
-          related_experiment_id: report.related_experiment_id ?? undefined,
-          work_content: report.work_content,
-          issues_risks: report.issues_risks ?? undefined,
-          next_plan: report.next_plan ?? undefined,
+          items:
+            report.items?.map((item) => ({
+              project_id: item.project_id,
+              experiment_record_id: item.experiment_record_id,
+              work_type: item.work_type,
+              content: item.content,
+              problem_note: item.problem_note,
+              next_step: item.next_step,
+              sort_order: item.sort_order,
+            })) ?? [],
         }
-      : { report_date: dayjs().format('YYYY-MM-DD'), work_content: '' }
+      : {
+          report_date: dayjs().format('YYYY-MM-DD'),
+          items: [{ work_type: 'other', content: '', sort_order: 0 }],
+        }
 
   const projectOptions = async () => {
     const res = await projectService.listProjects({ page_size: 200 }, currentUser)
     return res.items.map((p) => ({ label: `${p.project_code} · ${p.name}`, value: p.id }))
   }
 
-  const experimentOptions = async (projectId?: Id) => {
-    if (!projectId) return []
-    const res = await experimentService.listExperiments({ project_id: projectId, page_size: 200 }, currentUser)
+  const experimentOptions = async () => {
+    const res = await experimentService.listExperiments({ page_size: 200 }, currentUser)
     return res.items.map((e) => ({ label: `${e.experiment_no} · ${e.title}`, value: e.id }))
   }
 
@@ -78,12 +81,8 @@ export default function DailyReportFormModal({
       initialValues={initialValues}
       onFinish={async (values) => {
         const payload: DailyReportInput = {
-          project_id: values.project_id!,
-          related_experiment_id: values.related_experiment_id ?? null,
           report_date: values.report_date,
-          work_content: values.work_content,
-          issues_risks: values.issues_risks ?? null,
-          next_plan: values.next_plan ?? null,
+          items: values.items.map((item, index) => ({ ...item, sort_order: index })),
         }
         try {
           if (isEdit && report) {
@@ -114,40 +113,61 @@ export default function DailyReportFormModal({
         rules={[{ required: true, message: '请选择日期' }]}
         width="md"
       />
-      <ProFormSelect
-        name="project_id"
-        label="所属项目"
-        rules={[{ required: true, message: '请选择所属项目' }]}
-        request={projectOptions}
-        disabled={isEdit}
-        fieldProps={{
-          showSearch: true,
-          optionFilterProp: 'label',
-          onChange: () => formRef.current?.setFieldsValue({ related_experiment_id: undefined }),
-        }}
-        tooltip="仅可选择你可见（负责或参与）的项目"
-      />
-      <ProFormDependency name={['project_id']}>
-        {({ project_id }) => (
-          <ProFormSelect
-            name="related_experiment_id"
-            label="关联实验记录"
-            disabled={!project_id}
-            params={{ project_id }}
-            request={async () => experimentOptions(project_id)}
-            fieldProps={{ showSearch: true, optionFilterProp: 'label', allowClear: true }}
-            tooltip="可选，从该项目下你可见的实验记录中选择"
-          />
+      <ProFormList
+        name="items"
+        label="工作明细"
+        creatorButtonProps={{ creatorButtonText: '添加工作明细' }}
+        copyIconProps={false}
+        min={1}
+        itemRender={({ listDom, action }, { index }) => (
+          <div style={{ border: '1px solid #e8e1d8', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <strong>明细 {index + 1}</strong>
+              {action}
+            </div>
+            {listDom}
+          </div>
         )}
-      </ProFormDependency>
+        initialValue={initialValues.items}
+      >
+        <ProFormSelect
+          name="project_id"
+          label="所属项目"
+          rules={[{ required: true, message: '请选择所属项目' }]}
+          request={projectOptions}
+          fieldProps={{ showSearch: true, optionFilterProp: 'label' }}
+        />
+        <ProFormSelect
+          name="work_type"
+          label="工作类型"
+          options={[
+            { label: '实验', value: 'experiment' },
+            { label: '分析', value: 'analysis' },
+            { label: '纯化', value: 'purification' },
+            { label: '文档', value: 'documentation' },
+            { label: '会议', value: 'meeting' },
+            { label: '库存', value: 'inventory' },
+            { label: '其他', value: 'other' },
+          ]}
+          initialValue="other"
+          rules={[{ required: true }]}
+        />
+          <ProFormSelect
+            name="experiment_record_id"
+            label="关联实验记录"
+            request={experimentOptions}
+            fieldProps={{ showSearch: true, optionFilterProp: 'label', allowClear: true }}
+            tooltip="可选；提交时后端会校验实验与项目一致"
+          />
       <ProFormTextArea
-        name="work_content"
+        name="content"
         label="工作内容"
         rules={[{ required: true, message: '请填写工作内容' }]}
-        fieldProps={{ rows: 4 }}
+        fieldProps={{ rows: 3 }}
       />
-      <ProFormTextArea name="issues_risks" label="问题与风险" fieldProps={{ rows: 3 }} />
-      <ProFormTextArea name="next_plan" label="明日计划" fieldProps={{ rows: 3 }} />
+        <ProFormTextArea name="problem_note" label="问题与风险" fieldProps={{ rows: 2 }} />
+        <ProFormTextArea name="next_step" label="明日计划" fieldProps={{ rows: 2 }} />
+      </ProFormList>
       <Alert
         type="info"
         showIcon

@@ -7,8 +7,8 @@ from app.schemas.user import UserRead
 
 PROJECT_STATUSES = {"active", "paused", "completed", "cancelled"}
 PROJECT_MEMBER_ROLES = {"manager", "member"}
-PROJECT_OWNER_ROLES = {"admin", "pm", "project_manager", "principal_investigator"}
-PROJECT_WRITE_ROLES = {"admin", "pm", "project_manager"}
+PROJECT_OWNER_ROLES = {"admin", "project_manager"}
+PROJECT_WRITE_ROLES = {"admin", "project_manager"}
 
 
 class ProjectBase(BaseModel):

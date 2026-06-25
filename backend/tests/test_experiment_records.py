@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.models.business import InventoryTxn, Project, ReagentLot
+from app.models.business import ExperimentReagentUsage, InventoryTxn, Project, ReagentLot
 
 
 def login(client, username: str, password: str = "password123") -> str:
@@ -86,6 +86,7 @@ def record_payload(project_id: int, reagent_id: int | None = None, lot_id: int |
         "conclusion": "Proceed to purification",
         "next_step": "Scale to 1 g",
         "risk_note": "Moisture sensitive",
+        "participant_ids": [],
         "reagent_usages": [
             {
                 "reagent_id": reagent_id,
@@ -140,6 +141,104 @@ def test_create_experiment_record_success_with_usage_and_attachment_metadata(cli
     db_session.expire_all()
     assert db_session.get(ReagentLot, lot["id"]).quantity == Decimal("0.0000")
     assert db_session.query(InventoryTxn).count() == 0
+
+
+def test_participants_and_extended_fields_round_trip(client, create_user):
+    admin_headers, _, operator, _, project, _ = setup_users_and_project(client, create_user)
+    payload = record_payload(project["id"])
+    payload["participant_ids"] = [operator.id]
+
+    created = client.post("/api/experiment-records", headers=admin_headers, json=payload)
+    assert created.status_code == 201
+    assert created.json()["data"]["participant_ids"] == [operator.id]
+    assert created.json()["data"]["conclusion"] == "Proceed to purification"
+    assert created.json()["data"]["next_step"] == "Scale to 1 g"
+    assert created.json()["data"]["risk_note"] == "Moisture sensitive"
+
+    updated = client.patch(
+        f"/api/experiment-records/{created.json()['data']['id']}",
+        headers=admin_headers,
+        json={
+            "participant_ids": [],
+            "conclusion": "Updated conclusion",
+            "next_step": "Updated next step",
+            "risk_note": "Updated risk",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["data"]["participant_ids"] == []
+    assert updated.json()["data"]["conclusion"] == "Updated conclusion"
+    assert updated.json()["data"]["next_step"] == "Updated next step"
+    assert updated.json()["data"]["risk_note"] == "Updated risk"
+
+
+def test_confirm_dispense_deducts_once_records_shortage_and_links_transaction(client, create_user, db_session):
+    admin_headers, manager, _, _, project, _ = setup_users_and_project(client, create_user)
+    reagent, lot = create_reagent_and_lot(client, admin_headers)
+    client.post(
+        "/api/inventory-transactions",
+        headers=admin_headers,
+        json={"reagent_lot_id": lot["id"], "txn_type": "in", "quantity": "1.0000"},
+    )
+    payload = record_payload(project["id"], reagent["id"], lot["id"])
+    payload["reagent_usages"][0]["quantity"] = "1.2500"
+    record = client.post("/api/experiment-records", headers=admin_headers, json=payload).json()["data"]
+
+    dispensed = client.post(
+        f"/api/experiment-records/{record['id']}/dispense",
+        headers=auth_headers(client, "manager"),
+    )
+    assert dispensed.status_code == 200
+    usage = dispensed.json()["data"]["reagent_usages"][0]
+    assert usage["outbound_status"] == "insufficient"
+    assert Decimal(str(usage["shortage_qty"])) == Decimal("0.2500")
+    assert Decimal(str(usage["stock_available"])) == Decimal("0")
+
+    updated = client.patch(
+        f"/api/experiment-records/{record['id']}",
+        headers=admin_headers,
+        json={"conclusion": "Saved after dispensing", "reagent_usages": []},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["data"]["reagent_usages"][0]["outbound_status"] == "insufficient"
+
+    repeated = client.post(
+        f"/api/experiment-records/{record['id']}/dispense",
+        headers=auth_headers(client, "manager"),
+    )
+    assert repeated.status_code == 200
+
+    db_session.expire_all()
+    stored_lot = db_session.get(ReagentLot, lot["id"])
+    stored_usage = db_session.query(ExperimentReagentUsage).filter_by(experiment_record_id=record["id"]).one()
+    txns = db_session.query(InventoryTxn).filter_by(source_type="experiment", source_id=record["id"]).all()
+    assert stored_lot.quantity == Decimal("0.0000")
+    assert stored_usage.shortage_qty == Decimal("0.2500")
+    assert len(txns) == 1
+    assert txns[0].quantity == Decimal("1.0000")
+
+
+def test_operator_cannot_dispense_and_project_manager_cannot_dispense_other_project(client, create_user):
+    admin_headers, manager, _, _, project, _ = setup_users_and_project(client, create_user)
+    other_manager = create_user(username="other_manager", role="project_manager", must_change_password=False)
+    other_project = create_project(client, admin_headers, "P003", other_manager.id)
+    record = client.post(
+        "/api/experiment-records",
+        headers=admin_headers,
+        json=record_payload(other_project["id"], code="EXP-OTHER"),
+    ).json()["data"]
+
+    operator_response = client.post(
+        f"/api/experiment-records/{record['id']}/dispense",
+        headers=auth_headers(client, "operator"),
+    )
+    manager_response = client.post(
+        f"/api/experiment-records/{record['id']}/dispense",
+        headers=auth_headers(client, "manager"),
+    )
+    assert operator_response.status_code == 403
+    assert manager_response.status_code == 403
+    assert manager.id != other_manager.id
 
 
 def test_list_pagination_and_filters_by_project_status_and_type(client, create_user):
@@ -214,21 +313,20 @@ def test_regular_user_scope_is_limited_to_member_projects_or_created_records(cli
     hidden_detail = client.get(f"/api/experiment-records/{hidden_record['id']}", headers=auth_headers(client, "operator"))
 
     assert operator_list.status_code == 200
-    assert {item["id"] for item in operator_list.json()["data"]["items"]} == {own_project_record["id"], created_by_operator["id"]}
+    assert {item["id"] for item in operator_list.json()["data"]["items"]} == {created_by_operator["id"]}
     assert hidden_detail.status_code == 404
     assert other_operator_detail.status_code == 404
     assert operator.id != other_operator.id
 
 
-def test_admin_pm_project_manager_can_archive(client, create_user):
+def test_project_manager_cannot_archive(client, create_user):
     admin_headers, _, _, _, project, _ = setup_users_and_project(client, create_user)
     create_response = client.post("/api/experiment-records", headers=admin_headers, json=record_payload(project["id"]))
     record_id = create_response.json()["data"]["id"]
 
     response = client.post(f"/api/experiment-records/{record_id}/archive", headers=auth_headers(client, "manager"))
 
-    assert response.status_code == 200
-    assert response.json()["data"]["status"] == "archived"
+    assert response.status_code == 403
 
 
 def test_project_detail_experiment_record_count_uses_real_records(client, create_user, db_session):

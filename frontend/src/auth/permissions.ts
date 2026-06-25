@@ -4,22 +4,12 @@ import type { DailyReport, Experiment, Id, Project, Role, User } from '../types'
 export const roleLabel: Record<Role, string> = {
   admin: '系统管理员',
   director: '主任',
-  pm: '项目负责人',
   project_manager: '项目主管',
-  principal_investigator: '课题负责人',
-  researcher: '研究员',
-  analyst: '分析员',
   operator: '操作员',
-  qa: '质量人员',
 }
 
 /** 与后端 PROJECT_OWNER_ROLES 保持一致。 */
-export const OWNER_ROLES: Role[] = [
-  'admin',
-  'pm',
-  'project_manager',
-  'principal_investigator',
-]
+export const OWNER_ROLES: Role[] = ['admin', 'project_manager']
 
 export function isOwnerRole(role: Role): boolean {
   return OWNER_ROLES.includes(role)
@@ -37,9 +27,9 @@ export function isReadOnly(role: Role): boolean {
 export const can = {
   manageUsers: (role: Role) => role === 'admin',
   viewAdmin: (role: Role) => role === 'admin',
-  /** 新建项目：admin / pm / project_manager 可见。 */
-  createProject: (role: Role) => role === 'admin' || role === 'pm' || role === 'project_manager',
-  review: (role: Role) => role === 'admin' || role === 'pm' || role === 'project_manager',
+  /** 新建项目：admin / director / project_manager 可见。 */
+  createProject: (role: Role) => role === 'admin' || role === 'project_manager',
+  review: (role: Role) => role !== 'operator',
   writeData: (role: Role) => role !== 'director',
 }
 
@@ -51,7 +41,7 @@ export const can = {
  */
 export function canEditProject(user: User, project: Pick<Project, 'lead_user_id'>): boolean {
   if (user.role === 'admin') return true
-  if (user.role === 'pm' || user.role === 'project_manager') return project.lead_user_id === user.id
+  if (user.role === 'project_manager') return project.lead_user_id === user.id
   return false
 }
 
@@ -75,12 +65,12 @@ type ExperimentLike = Pick<
 
 /** 可新建实验记录：所有已登录角色（具体项目范围由表单限制为可见项目）。 */
 export function canCreateExperiment(role: Role): boolean {
-  return ['admin', 'pm', 'project_manager', 'researcher', 'analyst', 'operator'].includes(role)
+  return ['admin', 'project_manager', 'operator'].includes(role)
 }
 
 export function canViewExperiment(user: User, exp: ExperimentLike, scope: ProjectScope): boolean {
-  if (user.role === 'admin' || user.role === 'director') return true
-  if (user.role === 'pm' || user.role === 'project_manager') return scope.member.has(exp.project_id)
+  if (user.role === 'admin') return true
+  if (user.role === 'project_manager') return scope.managed.has(exp.project_id)
   return (
     scope.member.has(exp.project_id) &&
     (exp.lead_user_id === user.id || exp.participant_ids.includes(user.id))
@@ -94,8 +84,8 @@ export function canViewExperiment(user: User, exp: ExperimentLike, scope: Projec
  * - operator：自己创建或自己为负责人的实验。
  */
 export function canEditExperiment(user: User, exp: ExperimentLike, scope: ProjectScope): boolean {
-  if (user.role === 'admin') return true
-  if (user.role === 'pm' || user.role === 'project_manager') {
+  if (user.role === 'admin' || user.role === 'director') return true
+  if (user.role === 'project_manager') {
     return (
       scope.managed.has(exp.project_id) ||
       exp.lead_user_id === user.id ||
@@ -113,7 +103,7 @@ export function canDeleteExperiment(role: Role): boolean {
 /**
  * 可确认物料出库：
  * - admin：全部；
- * - pm/project_manager：自己负责项目下的实验；
+ * - project_manager：自己负责项目下的实验；
  * - operator：不可。
  */
 export function canDispenseMaterials(
@@ -121,8 +111,8 @@ export function canDispenseMaterials(
   exp: Pick<Experiment, 'project_id'>,
   scope: ProjectScope,
 ): boolean {
-  if (user.role === 'admin') return true
-  if (user.role === 'pm' || user.role === 'project_manager') {
+  if (user.role === 'admin' || user.role === 'director') return true
+  if (user.role === 'project_manager') {
     return scope.managed.has(exp.project_id)
   }
   return false
@@ -130,9 +120,9 @@ export function canDispenseMaterials(
 
 // ---------- 库存权限 ----------
 
-/** 手动入库/调整/冻结/新增批次：admin / project_manager。 */
+/** 手动入库/调整/冻结/新增批次：admin / director。 */
 export function canManageInventory(role: Role): boolean {
-  return role === 'admin' || role === 'project_manager'
+  return role === 'admin' || role === 'director'
 }
 
 // ---------- 日报权限 ----------
@@ -146,7 +136,7 @@ export function canCreateReport(role: Role): boolean {
 export function canViewReport(user: User, r: ReportLike, scope: ProjectScope): boolean {
   if (user.role === 'admin' || user.role === 'director') return true
   if (r.user_id === user.id) return true
-  if ((user.role === 'pm' || user.role === 'project_manager') && r.project_id != null) {
+  if (user.role === 'project_manager' && r.project_id != null) {
     return scope.managed.has(r.project_id)
   }
   return false
@@ -158,12 +148,12 @@ export function canEditReport(user: User, r: ReportLike): boolean {
 }
 
 /**
- * 可确认/退回日报：状态为已提交、非本人、且 admin 或 pm/project_manager 负责该项目。
+ * 可确认/退回日报：状态为已提交、非本人、且 admin/director 或 project_manager 负责该项目。
  */
 export function canConfirmReport(user: User, r: ReportLike, scope: ProjectScope): boolean {
   if (r.status !== 'submitted' || r.user_id === user.id) return false
-  if (user.role === 'admin') return true
-  if ((user.role === 'pm' || user.role === 'project_manager') && r.project_id != null) {
+  if (user.role === 'admin' || user.role === 'director') return true
+  if (user.role === 'project_manager' && r.project_id != null) {
     return scope.managed.has(r.project_id)
   }
   return false

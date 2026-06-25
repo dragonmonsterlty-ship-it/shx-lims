@@ -132,7 +132,7 @@ export default function ExperimentListPage() {
         <a key="view" onClick={() => navigate(`/experiments/${row.id}`)}>
           查看
         </a>,
-        USE_MOCK && canEditExperiment(user, row, scope) ? (
+        canEditExperiment(user, row, scope) ? (
           <ExperimentFormModal
             key="edit"
             mode="edit"
@@ -203,7 +203,7 @@ export default function ExperimentListPage() {
           }
         }}
         toolBarRender={() =>
-          USE_MOCK && canCreateExperiment(user.role)
+          canCreateExperiment(user.role)
             ? [
                 <ExperimentFormModal
                   key="create"

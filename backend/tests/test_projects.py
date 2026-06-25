@@ -32,6 +32,7 @@ def create_project_via_api(client, admin_headers: dict[str, str], code: str, lea
 
 def test_admin_can_create_project_and_manager_member_is_created(client, create_user, db_session):
     create_user(username="admin", role="admin", must_change_password=False)
+    create_user(username="director_user", role="director", must_change_password=False)
     manager = create_user(username="manager", role="project_manager", must_change_password=False)
 
     response = client.post("/api/projects", headers=auth_headers(client, "admin"), json=project_payload("P001", manager.id))
@@ -414,7 +415,8 @@ def test_project_detail_separates_owner_from_members_and_summary_endpoint(client
 
 def test_project_owner_candidates_exclude_regular_members(client, create_user):
     create_user(username="admin", role="admin", must_change_password=False)
-    create_user(username="pm_user", role="pm", must_change_password=False)
+    create_user(username="director_user", role="director", must_change_password=False)
+    create_user(username="pm_user", role="project_manager", must_change_password=False)
     create_user(username="project_manager_user", role="project_manager", must_change_password=False)
     create_user(username="pi_user", role="principal_investigator", must_change_password=False)
     create_user(username="researcher_user", role="researcher", must_change_password=False)
@@ -426,6 +428,6 @@ def test_project_owner_candidates_exclude_regular_members(client, create_user):
     role_group_response = client.get("/api/users", headers=auth_headers(client, "admin"), params={"role_group": "project_owner", "keyword": "user"})
 
     assert response.status_code == 200
-    assert {user["role"] for user in response.json()["data"]} == {"admin", "pm", "project_manager", "principal_investigator"}
+    assert {user["role"] for user in response.json()["data"]} == {"admin", "project_manager"}
     assert role_group_response.status_code == 200
-    assert {user["role"] for user in role_group_response.json()["data"]} == {"pm", "project_manager", "principal_investigator"}
+    assert {user["role"] for user in role_group_response.json()["data"]} == {"project_manager"}

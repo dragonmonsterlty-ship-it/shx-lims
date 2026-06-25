@@ -14,7 +14,7 @@ import { useUsers } from '../../hooks/useUsers'
 import { dailyReportService } from '../../services/dailyReport'
 import { experimentService } from '../../services/experiment'
 import { projectService } from '../../services/project'
-import type { Attachment, ExperimentMaterialUsage, Id } from '../../types'
+import type { Attachment, DailyReportItem, ExperimentMaterialUsage, Id } from '../../types'
 import { formatDate, formatDateTime, formatFileSize } from '../../utils/format'
 import DailyReportFormModal from './DailyReportFormModal'
 import ReportActions from './ReportActions'
@@ -146,19 +146,29 @@ export default function DailyReportDetailPage() {
                 ),
               },
               {
-                key: 'work',
-                label: '工作内容',
-                children: <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{report.work_content || '—'}</Paragraph>,
-              },
-              {
-                key: 'issues',
-                label: '问题与风险',
-                children: <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{report.issues_risks || '—'}</Paragraph>,
-              },
-              {
-                key: 'plan',
-                label: '明日计划',
-                children: <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{report.next_plan || '—'}</Paragraph>,
+                key: 'items',
+                label: `工作明细（${report.items?.length ?? 0}）`,
+                children: (
+                  <Table<DailyReportItem>
+                    rowKey="id"
+                    size="small"
+                    dataSource={report.items ?? []}
+                    pagination={false}
+                    columns={[
+                      { title: '工作内容', dataIndex: 'content', render: (v: string) => <Paragraph>{v}</Paragraph> },
+                      { title: '问题/风险', dataIndex: 'problem_note', render: (v: string | null) => v || '—' },
+                      { title: '明日计划', dataIndex: 'next_step', render: (v: string | null) => v || '—' },
+                      {
+                        title: '关联实验',
+                        dataIndex: 'experiment_record_id',
+                        width: 110,
+                        render: (v: Id | null) =>
+                          v ? <a onClick={() => navigate(`/experiments/${v}`)}>实验 #{v}</a> : '—',
+                      },
+                    ]}
+                    locale={{ emptyText: '暂无工作明细' }}
+                  />
+                ),
               },
               {
                 key: 'experiment',

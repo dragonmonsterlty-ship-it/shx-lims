@@ -6,10 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.project import ProjectUserBrief
 
 
-DAILY_REPORT_STATUSES = {"draft", "submitted", "reviewed", "returned", "archived"}
+DAILY_REPORT_STATUSES = {"draft", "submitted", "returned", "confirmed"}
 DAILY_REPORT_WORK_TYPES = {"experiment", "analysis", "purification", "documentation", "meeting", "inventory", "other"}
-DAILY_REPORT_REVIEW_ROLES = {"admin", "pm", "project_manager", "director"}
-DAILY_REPORT_ORDINARY_ROLES = {"researcher", "analyst", "operator", "qa"}
+DAILY_REPORT_REVIEW_ROLES = {"admin", "project_manager", "director"}
+DAILY_REPORT_ORDINARY_ROLES = {"operator"}
 
 
 class ExperimentRecordBrief(BaseModel):

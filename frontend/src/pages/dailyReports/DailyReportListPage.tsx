@@ -38,7 +38,7 @@ const STATUS_OPTIONS = [
   { label: '草稿', value: 'draft' },
   { label: '已提交', value: 'submitted' },
   { label: '已退回', value: 'returned' },
-  { label: '已审核', value: 'reviewed' },
+  { label: '已确认', value: 'confirmed' },
   { label: '已归档', value: 'archived' },
 ]
 

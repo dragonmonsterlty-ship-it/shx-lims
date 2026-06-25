@@ -22,6 +22,7 @@ from app.models.business import (  # noqa: E402
     ProjectMember,
     Reagent,
     ReagentLot,
+    ExperimentRecordParticipant,
 )
 from app.models.user import User  # noqa: E402
 
@@ -145,9 +146,21 @@ def inventory_txn(db, lot_id: int, quantity: Decimal, balance_after: Decimal, op
         )
 
 
-def experiment_record(db, code: str, project_id: int, creator: User, owner: User, lot_item: ReagentLot) -> ExperimentRecord:
+def experiment_record(
+    db,
+    code: str,
+    project_id: int,
+    creator: User,
+    owner: User,
+    lot_item: ReagentLot,
+    participant_ids: list[int],
+) -> ExperimentRecord:
     existing = db.query(ExperimentRecord).filter(ExperimentRecord.code == code).one_or_none()
     if existing is not None:
+        existing.conclusion = "Continue follow-up work"
+        existing.next_step = "Review and plan the next run"
+        existing.risk_note = "Demo risk note"
+        existing.participants = [ExperimentRecordParticipant(user_id=user_id) for user_id in participant_ids]
         return existing
     created = ExperimentRecord(
         project_id=project_id,
@@ -162,8 +175,11 @@ def experiment_record(db, code: str, project_id: int, creator: User, owner: User
         procedure="Prepare sample and run analytical method",
         result_summary="Demo result summary",
         conclusion="Continue follow-up work",
+        next_step="Review and plan the next run",
+        risk_note="Demo risk note",
         created_by=creator.id,
     )
+    created.participants = [ExperimentRecordParticipant(user_id=user_id) for user_id in participant_ids]
     created.reagent_usages.append(
         ExperimentReagentUsage(
             reagent_id=lot_item.reagent_id,
@@ -195,6 +211,18 @@ def experiment_record(db, code: str, project_id: int, creator: User, owner: User
 def daily_report(db, owner: User, project_id: int, record_id: int, summary: str) -> None:
     existing = db.query(DailyReport).filter(DailyReport.user_id == owner.id, DailyReport.summary == summary).one_or_none()
     if existing is not None:
+        if len(existing.items) < 2:
+            existing.items.append(
+                DailyReportItem(
+                    project_id=project_id,
+                    work_type="documentation",
+                    content="Updated experiment notes and handoff",
+                    problem_note="No blocking issue",
+                    next_step="Continue tomorrow",
+                    sort_order=2,
+                    created_by=owner.id,
+                )
+            )
         return
     report = DailyReport(
         user_id=owner.id,
@@ -217,6 +245,18 @@ def daily_report(db, owner: User, project_id: int, record_id: int, summary: str)
             created_by=owner.id,
         )
     )
+    report.items.append(
+        DailyReportItem(
+            project_id=project_id,
+            experiment_record_id=None,
+            work_type="documentation",
+            content="Updated experiment notes and handoff",
+            problem_note="No blocking issue",
+            next_step="Continue tomorrow",
+            sort_order=2,
+            created_by=owner.id,
+        )
+    )
     report.attachments.append(
         DailyReportAttachment(
             file_name="demo-chromatogram.pdf",
@@ -233,11 +273,12 @@ def daily_report(db, owner: User, project_id: int, record_id: int, summary: str)
 
 def seed_database(db) -> None:
     admin = user(db, "admin", "Demo Admin", "admin", "System")
-    pm = user(db, "pm", "Demo PM", "pm", "Project Office")
+    director = user(db, "director", "Demo Director", "director", "Management")
+    pm = user(db, "pm", "Demo PM", "project_manager", "Project Office")
     manager = user(db, "project_manager", "Demo Project Manager", "project_manager", "Chemistry")
-    researcher = user(db, "researcher", "Demo Researcher", "researcher", "Chemistry")
+    researcher = user(db, "researcher", "Demo Researcher", "operator", "Chemistry")
     operator = user(db, "operator", "Demo Operator", "operator", "Lab")
-    analyst = user(db, "analyst", "Demo Analyst", "analyst", "Analytical")
+    analyst = user(db, "analyst", "Demo Analyst", "operator", "Analytical")
 
     first_project = project(db, "DEMO-001", "Demo Assay Project", manager, admin.id)
     second_project = project(db, "DEMO-002", "Demo Formulation Project", pm, admin.id)
@@ -249,6 +290,7 @@ def seed_database(db) -> None:
     member(db, first_project.id, analyst.id, "member", admin.id)
     member(db, second_project.id, pm.id, "manager", admin.id)
     member(db, second_project.id, researcher.id, "member", admin.id)
+    member(db, second_project.id, operator.id, "member", admin.id)
 
     methanol = reagent(db, "Methanol", "67-56-1", "mL", Decimal("10.0000"), admin.id)
     acetonitrile = reagent(db, "Acetonitrile", "75-05-8", "mL", Decimal("10.0000"), admin.id)
@@ -259,8 +301,8 @@ def seed_database(db) -> None:
     inventory_txn(db, lot_a.id, Decimal("50.0000"), Decimal("50.0000"), operator.id)
     inventory_txn(db, lot_b.id, Decimal("20.0000"), Decimal("20.0000"), operator.id)
 
-    first_record = experiment_record(db, "EXP-DEMO-001", first_project.id, researcher, operator, lot_a)
-    second_record = experiment_record(db, "EXP-DEMO-002", second_project.id, researcher, analyst, lot_b)
+    first_record = experiment_record(db, "EXP-DEMO-001", first_project.id, researcher, operator, lot_a, [operator.id])
+    second_record = experiment_record(db, "EXP-DEMO-002", second_project.id, researcher, analyst, lot_b, [operator.id])
     db.flush()
     daily_report(db, researcher, first_project.id, first_record.id, "Demo daily report for assay project")
     daily_report(db, operator, second_project.id, second_record.id, "Demo daily report for formulation project")

@@ -1,16 +1,6 @@
 import type { Id } from './common'
 
-/** 兼容 T1.1 后端当前角色集合；权限真相仍以后端为准。 */
-export type Role =
-  | 'admin'
-  | 'director'
-  | 'pm'
-  | 'project_manager'
-  | 'principal_investigator'
-  | 'researcher'
-  | 'analyst'
-  | 'operator'
-  | 'qa'
+export type Role = 'admin' | 'director' | 'project_manager' | 'operator'
 
 export interface User {
   id: Id

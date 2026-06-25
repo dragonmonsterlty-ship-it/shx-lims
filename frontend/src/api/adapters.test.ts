@@ -67,9 +67,12 @@ describe('backend adapters', () => {
       objective: 'check',
       procedure: 'step1\nstep2',
       result_summary: 'ok',
+      conclusion: null,
+      next_step: null,
+      risk_note: null,
+      participant_ids: [4, 5],
+      reagent_usages: [],
     })
-    // 参与人不写入后端
-    expect('participant_ids' in payload).toBe(false)
   })
 
   it('auto-generates a code when experiment_no is empty and honors explicit record_type', () => {
@@ -206,7 +209,7 @@ describe('backend adapters', () => {
   it('daily report update only sends provided fields (no unknown keys)', () => {
     expect(toBackendDailyReportUpdate({ next_plan: 'np' })).toEqual({ next_plan: 'np' })
     const withItems = toBackendDailyReportUpdate({ items: [{ content: 'x' }] })
-    expect(Object.keys(withItems)).toEqual(['items'])
+    expect(Object.keys(withItems)).toEqual(['items', 'summary', 'issues', 'next_plan'])
     expect((withItems.items as Record<string, unknown>[])[0]).toMatchObject({ content: 'x', work_type: 'other' })
   })
 
@@ -325,7 +328,7 @@ describe('backend adapters', () => {
         related_experiment_id: 11,
         work_content: 'Daily summary',
         issues_risks: 'No blocker',
-        status: 'reviewed',
+        status: 'confirmed',
       }),
     )
   })

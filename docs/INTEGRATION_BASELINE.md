@@ -36,3 +36,9 @@ lims-fullstack-mvp/
 - 前端 real 模式经 `frontend/src/api/adapters.ts` 适配后端字段(项目 code/owner、实验 experiment-records、日报 items[]、试剂 reagents/reagent-lots)。
 - 角色词表归一:后端 `pm/researcher` 等 → 前端 `project_manager/operator`。
 - 已知非阻塞差异见 README「非阻塞遗留」。
+
+## T1.4 增量
+
+T1.4 在本基线之上完成角色/状态词表统一、实验扩展字段、日报多条明细及真实库存出库。
+详细合同和权限见 `docs/T1.4_BUSINESS_FLOWS.md`。T1.3.1 稳定基线 commit：
+`4123bafbd4764f9956a38af180b1c8b31a7acff9`。

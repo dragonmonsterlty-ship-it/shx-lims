@@ -68,9 +68,9 @@
 | DELETE | /experiments/{id} | — | `{deleted:true}` |
 | GET | /experiments/{id}/activities | — | `ExperimentActivity[]` |
 | GET | /experiments/{id}/material-usages | — | `ExperimentMaterialUsage[]` |
-| POST | /experiments/{id}/dispense | — | `ExperimentMaterialUsage[]`（扣库存+写流水） |
+| POST | /experiment-records/{id}/dispense | — | `Experiment`（扣库存+写实验来源流水） |
 
-`experiment_status = draft|planned|in_progress|completed|cancelled`。
+`experiment_status = draft|in_progress|submitted|reviewed|archived`。
 物料使用：`usage_role = starting_material|reagent|solvent|catalyst|standard|consumable`；
 `stock_status = sufficient|insufficient|no_stock_link`；`outbound_status = pending|dispensed|insufficient|revoked`。
 **规则**：保存不扣库存；出库只扣 pending 行且不重复；实际>库存→库存置 0 + `shortage_qty`。
@@ -89,7 +89,8 @@
 | GET | /daily-reports/{id}/activities | — | `DailyReportActivity[]` |
 | GET | /daily-reports/{id}/attachments | — | `Attachment[]`（entity_type=`daily_report`） |
 
-`daily_report_status = draft|submitted|returned|confirmed`。**不做删除**（后续作废）。
+`daily_report_status = draft|submitted|returned|confirmed`。日报使用 `items[]` 多条明细；
+每条包含工作内容、问题/风险、明日计划和可选关联实验。**不做删除/归档**。
 **规则**：提交人=当前用户；作者≠确认人；退回必填原因。
 
 ## 5. Inventory（`src/services/inventory.ts`，mock-only）

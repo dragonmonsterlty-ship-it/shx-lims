@@ -79,7 +79,7 @@ def ensure_can_create_project(user: User) -> None:
 def ensure_can_update_project(db: Session, user: User, project_id: int) -> None:
     if is_admin(user):
         return
-    if user.role in {"pm", "project_manager"} and is_project_manager(db, user, project_id):
+    if user.role == "project_manager" and is_project_manager(db, user, project_id):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project update permission required")
 
@@ -87,7 +87,7 @@ def ensure_can_update_project(db: Session, user: User, project_id: int) -> None:
 def ensure_can_manage_members(db: Session, user: User, project_id: int) -> None:
     if is_admin(user):
         return
-    if user.role in {"pm", "project_manager"} and is_project_manager(db, user, project_id):
+    if user.role == "project_manager" and is_project_manager(db, user, project_id):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project manager role required")
 

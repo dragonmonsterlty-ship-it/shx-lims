@@ -8,8 +8,6 @@ export type DailyReportStatus =
   | 'draft'
   | 'submitted'
   | 'returned'
-  | 'reviewed'
-  | 'archived'
   | 'confirmed'
 
 export interface DailyReportItem {
@@ -78,10 +76,10 @@ export interface DailyReportItemInput {
 }
 
 export interface DailyReportInput {
-  project_id: Id
+  project_id?: Id
   related_experiment_id?: Id | null
   report_date: string
-  work_content: string
+  work_content?: string
   issues_risks?: string | null
   next_plan?: string | null
   /** 多条明细；省略则由扁平字段自动转为单条 item，兼容旧表单。 */

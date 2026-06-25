@@ -232,15 +232,40 @@ export const mockServer = {
       return r ? ok(r) : fail(404, '日报不存在')
     },
     create(input: DailyReportInput, actorId: Id): Promise<ApiEnvelope<DailyReport>> {
+      const itemInputs = input.items?.length
+        ? input.items
+        : [{
+            project_id: input.project_id ?? null,
+            experiment_record_id: input.related_experiment_id ?? null,
+            content: input.work_content ?? '',
+            problem_note: input.issues_risks ?? null,
+            next_step: input.next_plan ?? null,
+            work_type: 'other',
+          }]
+      const items = itemInputs.map((item, index) => ({
+        id: db.nextId(),
+        daily_report_id: 0,
+        project_id: item.project_id ?? null,
+        experiment_record_id: item.experiment_record_id ?? null,
+        work_type: item.work_type ?? 'other',
+        content: item.content,
+        progress_note: item.progress_note ?? null,
+        hours_spent: item.hours_spent ?? null,
+        problem_note: item.problem_note ?? null,
+        next_step: item.next_step ?? null,
+        sort_order: item.sort_order ?? index,
+      }))
+      const first = items[0]
       const report: DailyReport = {
         id: db.nextId(),
         user_id: actorId,
-        project_id: input.project_id,
-        related_experiment_id: input.related_experiment_id ?? null,
+        project_id: first?.project_id ?? null,
+        related_experiment_id: first?.experiment_record_id ?? null,
         report_date: input.report_date,
-        work_content: input.work_content,
-        issues_risks: input.issues_risks ?? null,
-        next_plan: input.next_plan ?? null,
+        work_content: input.work_content ?? first?.content ?? '',
+        issues_risks: input.issues_risks ?? first?.problem_note ?? null,
+        next_plan: input.next_plan ?? first?.next_step ?? null,
+        items,
         status: 'draft',
         submitted_at: null,
         reviewed_by: null,
@@ -252,6 +277,7 @@ export const mockServer = {
         updated_by: actorId,
         updated_at: dayjs().toISOString(),
       }
+      for (const item of items) item.daily_report_id = report.id
       db.dailyReports.push(report)
       addReportActivity(report.id, '创建日报', actorId)
       return ok(report)
@@ -260,6 +286,27 @@ export const mockServer = {
       const r = db.dailyReports.find((x) => x.id === id && !x.is_deleted)
       if (!r) return fail(404, '日报不存在')
       Object.assign(r, input, { updated_by: actorId, updated_at: dayjs().toISOString() })
+      if (input.items) {
+        r.items = input.items.map((item, index) => ({
+          id: db.nextId(),
+          daily_report_id: r.id,
+          project_id: item.project_id ?? null,
+          experiment_record_id: item.experiment_record_id ?? null,
+          work_type: item.work_type ?? 'other',
+          content: item.content,
+          progress_note: item.progress_note ?? null,
+          hours_spent: item.hours_spent ?? null,
+          problem_note: item.problem_note ?? null,
+          next_step: item.next_step ?? null,
+          sort_order: item.sort_order ?? index,
+        }))
+        const first = r.items[0]
+        r.project_id = first?.project_id ?? null
+        r.related_experiment_id = first?.experiment_record_id ?? null
+        r.work_content = first?.content ?? ''
+        r.issues_risks = first?.problem_note ?? null
+        r.next_plan = first?.next_step ?? null
+      }
       addReportActivity(r.id, '编辑日报', actorId)
       return ok(r)
     },
@@ -390,6 +437,9 @@ export const mockServer = {
         objective: input.objective ?? null,
         steps: Array.isArray(input.steps) ? input.steps.join('\n') : (input.steps ?? null),
         result_summary: input.result_summary ?? null,
+        conclusion: input.conclusion ?? null,
+        next_step: input.next_step ?? null,
+        risk_note: input.risk_note ?? null,
         is_deleted: false,
         created_by: actorId,
         created_at: dayjs().toISOString(),
@@ -747,13 +797,10 @@ function addReportActivity(reportId: Id, action: string, actorId: Id): void {
 
 const EXPERIMENT_STATUS_LABEL: Record<Experiment['status'], string> = {
   draft: '草稿',
-  planned: '计划中',
   in_progress: '进行中',
   submitted: '已提交',
   reviewed: '已审核',
   archived: '已归档',
-  completed: '已完成',
-  cancelled: '已取消',
 }
 
 /** 实验可见范围（与前端 canViewExperiment 一致）。 */

@@ -29,11 +29,12 @@ def test_seed_demo_is_idempotent_and_uses_documented_accounts(db_session):
     users = {item.username: item.role for item in db_session.query(User).all()}
     assert users == {
         "admin": "admin",
-        "pm": "pm",
+        "director": "director",
+        "pm": "project_manager",
         "project_manager": "project_manager",
-        "researcher": "researcher",
+        "researcher": "operator",
         "operator": "operator",
-        "analyst": "analyst",
+        "analyst": "operator",
     }
 
 

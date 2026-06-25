@@ -176,6 +176,6 @@ def test_contract_smoke_lists_permissions_and_pagination(client, create_user):
     )
     anonymous_projects = client.get("/api/projects")
 
-    assert operator_txn.status_code == 201
-    assert director_txn.status_code == 403
+    assert operator_txn.status_code == 403
+    assert director_txn.status_code == 201
     assert anonymous_projects.status_code == 401

@@ -9,9 +9,9 @@ from app.schemas.project import ProjectUserBrief
 EXPERIMENT_RECORD_STATUSES = {"draft", "in_progress", "submitted", "reviewed", "archived"}
 EXPERIMENT_RECORD_TYPES = {"synthesis", "analysis", "purification", "formulation", "stability", "other"}
 EXPERIMENT_ATTACHMENT_TYPES = {"hplc", "lcms", "nmr", "ms", "ir", "image", "pdf", "other"}
-EXPERIMENT_RECORD_CREATE_ROLES = {"admin", "pm", "project_manager", "researcher", "analyst", "operator"}
-EXPERIMENT_RECORD_ADMIN_ROLES = {"admin", "pm", "project_manager"}
-EXPERIMENT_RECORD_VIEW_ALL_ROLES = {"admin", "pm", "project_manager", "director"}
+EXPERIMENT_RECORD_CREATE_ROLES = {"admin", "project_manager", "operator"}
+EXPERIMENT_RECORD_ADMIN_ROLES = {"admin"}
+EXPERIMENT_RECORD_VIEW_ALL_ROLES = {"admin", "director"}
 
 
 class ExperimentProjectBrief(BaseModel):
@@ -44,6 +44,11 @@ class ExperimentReagentUsageRead(ExperimentReagentUsageBase):
     created_at: datetime
     updated_by: int | None = None
     updated_at: datetime | None = None
+    outbound_status: str
+    shortage_qty: Decimal | None = None
+    stock_available: Decimal | None = None
+    dispensed_by: int | None = None
+    dispensed_at: datetime | None = None
 
 
 class ExperimentAttachmentBase(BaseModel):
@@ -87,6 +92,7 @@ class ExperimentRecordBase(BaseModel):
 
 
 class ExperimentRecordCreate(ExperimentRecordBase):
+    participant_ids: list[int] = Field(default_factory=list)
     reagent_usages: list[ExperimentReagentUsageCreate] = Field(default_factory=list)
     attachments: list[ExperimentAttachmentCreate] = Field(default_factory=list)
 
@@ -106,6 +112,7 @@ class ExperimentRecordUpdate(BaseModel):
     conclusion: str | None = None
     next_step: str | None = None
     risk_note: str | None = None
+    participant_ids: list[int] | None = None
     reagent_usages: list[ExperimentReagentUsageCreate] | None = None
     attachments: list[ExperimentAttachmentCreate] | None = None
 
@@ -137,6 +144,7 @@ class ExperimentRecordDetail(ExperimentRecordListItem):
     conclusion: str | None = None
     next_step: str | None = None
     risk_note: str | None = None
+    participant_ids: list[int] = Field(default_factory=list)
     reagent_usages: list[ExperimentReagentUsageRead] = Field(default_factory=list)
     attachments: list[ExperimentAttachmentRead] = Field(default_factory=list)
     created_at: datetime

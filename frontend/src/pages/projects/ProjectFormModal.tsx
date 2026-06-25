@@ -41,7 +41,7 @@ export default function ProjectFormModal({
   const { message } = App.useApp()
   const isEdit = mode === 'edit'
   // project_manager 的负责人锁定为本人（新建与编辑均不可改）。
-  const lockOwner = currentUser.role === 'pm' || currentUser.role === 'project_manager'
+  const lockOwner = currentUser.role === 'project_manager'
 
   // 编辑时异步载入当前组员，作为初始值。
   const editRequest = async (): Promise<FormValues> => {

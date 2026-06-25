@@ -78,7 +78,7 @@ def test_admin_can_create_reagent(client, create_user):
     assert response.json()["data"]["created_by"] is not None
 
 
-def test_director_and_operator_can_view_reagents_but_director_cannot_write(client, create_user):
+def test_director_can_manage_reagents_and_operator_is_read_only(client, create_user):
     setup_users(create_user)
     admin_headers = auth_headers(client, "admin")
     reagent = create_reagent(client, admin_headers)
@@ -94,8 +94,8 @@ def test_director_and_operator_can_view_reagents_but_director_cannot_write(clien
     assert [item["id"] for item in director_list.json()["data"]["items"]] == [reagent["id"]]
     assert operator_detail.status_code == 200
     assert operator_detail.json()["data"]["id"] == reagent["id"]
-    assert director_create.status_code == 403
-    assert director_patch.status_code == 403
+    assert director_create.status_code == 201
+    assert director_patch.status_code == 200
 
 
 def test_reagent_list_supports_keyword_is_active_and_pagination(client, create_user):
@@ -150,7 +150,7 @@ def test_inventory_in_increases_lot_quantity_and_records_balance_after(client, c
     reagent = create_reagent(client, admin_headers)
     lot = create_lot(client, admin_headers, reagent["id"])
 
-    txn = create_txn(client, auth_headers(client, "operator"), lot["id"], "in", "25.5000")
+    txn = create_txn(client, auth_headers(client, "director"), lot["id"], "in", "25.5000")
 
     assert txn["txn_type"] == "in"
     assert Decimal(str(txn["balance_after"])) == Decimal("25.5000")
@@ -165,7 +165,7 @@ def test_inventory_out_decreases_lot_quantity_and_records_balance_after(client, 
     lot = create_lot(client, admin_headers, reagent["id"])
     create_txn(client, admin_headers, lot["id"], "in", "25.0000")
 
-    txn = create_txn(client, auth_headers(client, "manager"), lot["id"], "out", "5.0000")
+    txn = create_txn(client, auth_headers(client, "director"), lot["id"], "out", "5.0000")
 
     assert txn["txn_type"] == "out"
     assert Decimal(str(txn["balance_after"])) == Decimal("20.0000")
@@ -182,7 +182,7 @@ def test_inventory_out_rejects_insufficient_quantity_and_leaves_balance_unchange
 
     response = client.post(
         "/api/inventory-transactions",
-        headers=auth_headers(client, "operator"),
+        headers=admin_headers,
         json={"reagent_lot_id": lot["id"], "txn_type": "out", "quantity": "4.2500"},
     )
 
@@ -203,7 +203,7 @@ def test_inventory_adjust_uses_target_quantity_and_records_balance_after(client,
     lot = create_lot(client, admin_headers, reagent["id"])
     create_txn(client, admin_headers, lot["id"], "in", "10.0000")
 
-    txn = create_txn(client, auth_headers(client, "operator"), lot["id"], "adjust", target_quantity="8.5000")
+    txn = create_txn(client, auth_headers(client, "director"), lot["id"], "adjust", target_quantity="8.5000")
 
     assert Decimal(str(txn["quantity"])) == Decimal("-1.5000")
     assert Decimal(str(txn["balance_after"])) == Decimal("8.5000")
@@ -249,8 +249,8 @@ def test_lot_and_txn_lists_support_filters_and_pagination(client, create_user):
     controlled_lot = create_lot(client, admin_headers, reagent["id"], "CTRL")
     client.patch(f"/api/reagent-lots/{controlled_lot['id']}", headers=admin_headers, json={"controlled_flag": True})
     other_lot = create_lot(client, admin_headers, reagent["id"], "OTHER")
-    txn = create_txn(client, auth_headers(client, "operator"), controlled_lot["id"], "in", "1.2345")
-    create_txn(client, auth_headers(client, "operator"), other_lot["id"], "in", "2.0000")
+    txn = create_txn(client, auth_headers(client, "director"), controlled_lot["id"], "in", "1.2345")
+    create_txn(client, auth_headers(client, "director"), other_lot["id"], "in", "2.0000")
 
     lot_response = client.get(
         "/api/reagent-lots",
@@ -281,7 +281,22 @@ def test_director_cannot_create_inventory_transaction(client, create_user):
         json={"reagent_lot_id": lot["id"], "txn_type": "in", "quantity": "1.0000"},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 201
+
+
+def test_project_manager_and_operator_cannot_manually_operate_inventory(client, create_user):
+    setup_users(create_user)
+    admin_headers = auth_headers(client, "admin")
+    reagent = create_reagent(client, admin_headers)
+    lot = create_lot(client, admin_headers, reagent["id"])
+
+    for username in ("manager", "operator"):
+        response = client.post(
+            "/api/inventory-transactions",
+            headers=auth_headers(client, username),
+            json={"reagent_lot_id": lot["id"], "txn_type": "in", "quantity": "1.0000"},
+        )
+        assert response.status_code == 403
 
 
 def test_unauthenticated_reagent_access_fails(client):
@@ -296,7 +311,7 @@ def test_decimal_precision_is_preserved_for_inventory(client, create_user, db_se
     reagent = create_reagent(client, admin_headers, min_stock="0.0001")
     lot = create_lot(client, admin_headers, reagent["id"])
 
-    txn = create_txn(client, auth_headers(client, "operator"), lot["id"], "in", "0.1234")
+    txn = create_txn(client, auth_headers(client, "director"), lot["id"], "in", "0.1234")
 
     assert Decimal(str(txn["balance_after"])) == Decimal("0.1234")
     db_session.expire_all()

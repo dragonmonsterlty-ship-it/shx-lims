@@ -109,3 +109,6 @@ class InventoryTxnRead(BaseModel):
     reference: str | None = None
     operator_id: int | None = None
     txn_at: datetime
+    source_type: str = "manual"
+    source_id: int | None = None
+    shortage_qty: Decimal | None = None

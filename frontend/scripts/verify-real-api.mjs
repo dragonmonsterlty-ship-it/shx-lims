@@ -23,6 +23,28 @@ async function api(path, { token, method = 'GET', body } = {}) {
   return envelope.data
 }
 
+async function loginAs(username) {
+  return api('/auth/login', {
+    method: 'POST',
+    body: { username, password },
+  })
+}
+
+async function expectHttp(path, expectedStatus, { token, method = 'GET', body } = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (response.status !== expectedStatus) {
+    throw new Error(`${method} ${path}: expected HTTP ${expectedStatus}, got ${response.status}`)
+  }
+}
+
 function assertPage(name, value) {
   if (
     !value ||
@@ -38,10 +60,7 @@ function assertPage(name, value) {
 const health = await api('/health')
 if (health.status !== 'ok') throw new Error('health status is not ok')
 
-const login = await api('/auth/login', {
-  method: 'POST',
-  body: { username, password },
-})
+const login = await loginAs(username)
 const token = login.access_token
 if (!token) throw new Error('login response has no access_token')
 
@@ -77,6 +96,155 @@ const lots = await api('/reagent-lots?page=1&page_size=20', { token })
 assertPage('reagent-lots', lots)
 if (!lots.items.length) throw new Error('reagent-lots list is empty; run backend demo seed')
 
+const managerLogin = await loginAs('project_manager')
+const operatorLogin = await loginAs('operator')
+const directorLogin = await loginAs('director')
+for (const [name, session] of [
+  ['project_manager', managerLogin],
+  ['operator', operatorLogin],
+  ['director', directorLogin],
+]) {
+  if (!session.access_token) throw new Error(`${name} login response has no access_token`)
+}
+
+const managerProjects = await api('/projects?page=1&page_size=20', {
+  token: managerLogin.access_token,
+})
+assertPage('project_manager projects', managerProjects)
+if (!managerProjects.items.length) throw new Error('project_manager has no managed project')
+const project = managerProjects.items[0]
+await api(`/projects/${project.id}`, { token: managerLogin.access_token })
+
+const projectMembers = await api(`/projects/${project.id}/members`, {
+  token: managerLogin.access_token,
+})
+const operator = projectMembers.find((member) => member.user?.username === 'operator')?.user
+if (!operator) throw new Error('managed project has no operator member')
+
+const lot = lots.items[0]
+const suffix = `${Date.now()}`
+const createdExperiment = await api('/experiment-records', {
+  token: operatorLogin.access_token,
+  method: 'POST',
+  body: {
+    project_id: project.id,
+    code: `EXP-T14-${suffix}`,
+    title: 'T1.4 real flow verification',
+    record_type: 'analysis',
+    status: 'draft',
+    owner_id: operator.id,
+    participant_ids: [operator.id],
+    objective: 'Verify real experiment field persistence',
+    procedure: 'Create, read, update, then dispense',
+    result_summary: 'Created by real API verification',
+    conclusion: 'Initial conclusion',
+    next_step: 'Confirm outbound',
+    risk_note: 'Verification-only record',
+    reagent_usages: [
+      {
+        lot_id: lot.id,
+        quantity: '0.1000',
+        unit: lot.unit,
+        purpose: 'analysis',
+      },
+    ],
+  },
+})
+if (createdExperiment.participant_ids?.[0] !== operator.id) {
+  throw new Error('participant_ids did not round-trip')
+}
+const updatedExperiment = await api(`/experiment-records/${createdExperiment.id}`, {
+  token: operatorLogin.access_token,
+  method: 'PATCH',
+  body: {
+    conclusion: 'Verified conclusion',
+    next_step: 'Verified next step',
+    risk_note: 'Verified risk note',
+  },
+})
+if (
+  updatedExperiment.conclusion !== 'Verified conclusion' ||
+  updatedExperiment.next_step !== 'Verified next step' ||
+  updatedExperiment.risk_note !== 'Verified risk note'
+) {
+  throw new Error('experiment extended fields did not round-trip')
+}
+await expectHttp(`/experiment-records/${createdExperiment.id}/dispense`, 403, {
+  token: operatorLogin.access_token,
+  method: 'POST',
+})
+const dispensedExperiment = await api(`/experiment-records/${createdExperiment.id}/dispense`, {
+  token: managerLogin.access_token,
+  method: 'POST',
+})
+if (!['dispensed', 'insufficient'].includes(dispensedExperiment.reagent_usages[0]?.outbound_status)) {
+  throw new Error('experiment usage was not dispensed')
+}
+const lotTxns = await api(`/inventory-transactions?reagent_lot_id=${lot.id}&page_size=100`, {
+  token,
+})
+assertPage('lot transactions', lotTxns)
+if (!lotTxns.items.some((item) => item.source_type === 'experiment' && item.source_id === createdExperiment.id)) {
+  throw new Error('experiment inventory transaction is missing')
+}
+const lotExperiments = await api(`/reagent-lots/${lot.id}/experiments`, { token })
+if (!lotExperiments.some((item) => item.experiment_id === createdExperiment.id)) {
+  throw new Error('lot detail does not link back to experiment')
+}
+await expectHttp('/inventory-transactions', 403, {
+  token: operatorLogin.access_token,
+  method: 'POST',
+  body: { reagent_lot_id: lot.id, txn_type: 'in', quantity: '0.1000' },
+})
+await api('/inventory-transactions', {
+  token: directorLogin.access_token,
+  method: 'POST',
+  body: {
+    reagent_lot_id: lot.id,
+    txn_type: 'in',
+    quantity: '0.1000',
+    reference: 'T1.4 real verification replenishment',
+  },
+})
+
+const report = await api('/daily-reports', {
+  token: operatorLogin.access_token,
+  method: 'POST',
+  body: {
+    report_date: new Date().toISOString().slice(0, 10),
+    items: [
+      {
+        project_id: project.id,
+        experiment_record_id: createdExperiment.id,
+        work_type: 'analysis',
+        content: 'Verified experiment real flow',
+        problem_note: 'No blocker',
+        next_step: 'Review inventory transaction',
+        sort_order: 0,
+      },
+      {
+        project_id: project.id,
+        work_type: 'documentation',
+        content: 'Updated verification notes',
+        problem_note: 'None',
+        next_step: 'Close T1.4 verification',
+        sort_order: 1,
+      },
+    ],
+  },
+})
+if (report.items?.length !== 2) throw new Error('daily report did not persist multiple items')
+await api(`/daily-reports/${report.id}/submit`, {
+  token: operatorLogin.access_token,
+  method: 'POST',
+})
+const confirmedReport = await api(`/daily-reports/${report.id}/review`, {
+  token: managerLogin.access_token,
+  method: 'POST',
+  body: { review_comment: 'T1.4 verified' },
+})
+if (confirmedReport.status !== 'confirmed') throw new Error('daily report was not confirmed')
+
 console.log(
   JSON.stringify(
     {
@@ -89,6 +257,9 @@ console.log(
       daily_reports: reports.total,
       reagents: reagents.total,
       reagent_lots: lots.total,
+      real_flow_experiment: createdExperiment.id,
+      real_flow_report: report.id,
+      real_flow_outbound: dispensedExperiment.reagent_usages[0]?.outbound_status,
     },
     null,
     2,

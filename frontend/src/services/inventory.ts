@@ -118,7 +118,20 @@ export async function listTransactions(batchId: Id): Promise<InventoryTransactio
 
 export async function listBatchExperiments(batchId: Id) {
   if (USE_MOCK) return unwrap(await mockServer.inventory.listBatchExperiments(batchId))
-  return []
+  return request<
+    {
+      experiment_id: Id
+      experiment_no: string
+      title: string
+      project_id: Id
+      project_code: string
+      project_name: string
+      actual_qty: number | null
+      unit: string | null
+      outbound_status: string
+      shortage_qty?: number | null
+    }[]
+  >({ method: 'GET', url: endpoints.reagents.lotExperiments(batchId) })
 }
 
 export async function createReagent(input: ReagentInput): Promise<Material> {

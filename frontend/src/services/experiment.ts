@@ -120,10 +120,13 @@ export async function dispenseMaterials(
   actorId: Id,
 ): Promise<ExperimentMaterialUsage[]> {
   if (USE_MOCK) return unwrap(await mockServer.experiments.dispenseMaterials(id, actorId))
-  throw createApiError({
-    code: 405,
-    message: '当前后端契约不支持从实验记录直接确认物料出库',
-  })
+  const experiment = adaptExperiment(
+    await request<BackendExperiment>({
+      method: 'POST',
+      url: endpoints.experiments.dispense(id),
+    }),
+  )
+  return experiment.material_usages ?? []
 }
 
 export const experimentService = {

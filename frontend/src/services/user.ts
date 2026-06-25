@@ -15,7 +15,7 @@ export async function listProjectOwnerCandidates(keyword?: string): Promise<User
   if (USE_MOCK) {
     const users = unwrap(await mockServer.users.list())
     return users.filter((user) =>
-      ['admin', 'pm', 'project_manager', 'principal_investigator'].includes(user.role),
+      ['admin', 'project_manager'].includes(user.role),
     )
   }
   const users = await request<BackendUserBrief[]>({

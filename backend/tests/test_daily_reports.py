@@ -85,7 +85,7 @@ def report_payload(project_id: int | None = None, experiment_record_id: int | No
 
 def setup_users_projects_and_record(client, create_user):
     create_user(username="admin", role="admin", must_change_password=False)
-    create_user(username="pm", role="pm", must_change_password=False)
+    create_user(username="pm", role="project_manager", must_change_password=False)
     create_user(username="director", role="director", must_change_password=False)
     manager = create_user(username="manager", role="project_manager", must_change_password=False)
     researcher = create_user(username="researcher", role="researcher", must_change_password=False)
@@ -204,7 +204,7 @@ def test_daily_report_submit_review_return_state_transitions_success(client, cre
     assert submitted.status_code == 200
     assert submitted.json()["data"]["status"] == "submitted"
     assert reviewed.status_code == 200
-    assert reviewed.json()["data"]["status"] == "reviewed"
+    assert reviewed.json()["data"]["status"] == "confirmed"
 
     second = client.post("/api/daily-reports", headers=researcher_headers, json=report_payload(project["id"], record["id"], "Needs return")).json()["data"]
     client.post(f"/api/daily-reports/{second['id']}/submit", headers=researcher_headers)
@@ -236,7 +236,7 @@ def test_regular_user_cannot_review_or_archive(client, create_user):
     archive = client.post(f"/api/daily-reports/{report['id']}/archive", headers=auth_headers(client, "operator"))
 
     assert review.status_code in {403, 404}
-    assert archive.status_code in {403, 404}
+    assert archive.status_code in {403, 404, 405}
 
 
 def test_admin_pm_project_manager_can_view_and_review(client, create_user):
@@ -245,21 +245,44 @@ def test_admin_pm_project_manager_can_view_and_review(client, create_user):
     report = client.post("/api/daily-reports", headers=researcher_headers, json=report_payload(project["id"], record["id"])).json()["data"]
     client.post(f"/api/daily-reports/{report['id']}/submit", headers=researcher_headers)
 
-    pm_list = client.get("/api/daily-reports", headers=auth_headers(client, "pm"))
+    pm_list = client.get("/api/daily-reports", headers=auth_headers(client, "manager"))
     manager_review = client.post(f"/api/daily-reports/{report['id']}/review", headers=auth_headers(client, "manager"), json={"review_comment": "ok"})
 
     assert pm_list.status_code == 200
     assert pm_list.json()["data"]["total"] == 1
     assert manager_review.status_code == 200
-    assert manager_review.json()["data"]["status"] == "reviewed"
+    assert manager_review.json()["data"]["status"] == "confirmed"
 
 
-def test_daily_report_archive_success_for_admin_role(client, create_user):
+def test_project_manager_only_reviews_reports_for_managed_projects(client, create_user):
+    admin_headers, project, _, record = setup_users_projects_and_record(client, create_user)
+    other_manager = create_user(username="other_manager", role="project_manager", must_change_password=False)
+    other_operator = create_user(username="other_team_operator", role="operator", must_change_password=False)
+    other_project = create_project(client, admin_headers, "DR003", other_manager.id)
+    add_member(client, admin_headers, other_project["id"], other_operator.id)
+    other_record = create_experiment_record(client, admin_headers, other_project["id"], "EXP-DR-OTHER")
+    report = client.post(
+        "/api/daily-reports",
+        headers=auth_headers(client, "other_team_operator"),
+        json=report_payload(other_project["id"], other_record["id"]),
+    ).json()["data"]
+    client.post(f"/api/daily-reports/{report['id']}/submit", headers=auth_headers(client, "other_team_operator"))
+
+    manager_list = client.get("/api/daily-reports", headers=auth_headers(client, "manager"))
+    manager_review = client.post(
+        f"/api/daily-reports/{report['id']}/review",
+        headers=auth_headers(client, "manager"),
+        json={"review_comment": "should not pass"},
+    )
+    assert report["id"] not in {item["id"] for item in manager_list.json()["data"]["items"]}
+    assert manager_review.status_code == 404
+
+
+def test_daily_report_archive_is_not_part_of_t1_4_flow(client, create_user):
     _, project, _, record = setup_users_projects_and_record(client, create_user)
     report = client.post("/api/daily-reports", headers=auth_headers(client, "researcher"), json=report_payload(project["id"], record["id"])).json()["data"]
     client.post(f"/api/daily-reports/{report['id']}/submit", headers=auth_headers(client, "researcher"))
 
     response = client.post(f"/api/daily-reports/{report['id']}/archive", headers=auth_headers(client, "admin"))
 
-    assert response.status_code == 200
-    assert response.json()["data"]["status"] == "archived"
+    assert response.status_code == 405

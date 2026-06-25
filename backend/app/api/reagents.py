@@ -15,6 +15,7 @@ from app.schemas.reagent import (
     ReagentUpdate,
 )
 from app.services import reagents as reagent_service
+from app.services import experiment_records as experiment_record_service
 
 
 reagents_router = APIRouter()
@@ -121,6 +122,12 @@ def read_reagent_lot(lot_id: int, db: DbSession, current_user: CurrentUser) -> d
     _ = current_user
     lot = reagent_service.get_lot_or_404(db, lot_id)
     return api_response(ReagentLotRead.model_validate(lot).model_dump())
+
+
+@reagent_lots_router.get("/{lot_id}/experiments")
+def list_reagent_lot_experiments(lot_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    reagent_service.get_lot_or_404(db, lot_id)
+    return api_response(experiment_record_service.list_records_for_lot(db, current_user, lot_id))
 
 
 @reagent_lots_router.patch("/{lot_id}")

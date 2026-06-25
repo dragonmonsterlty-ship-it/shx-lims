@@ -220,6 +220,7 @@ class ExperimentRecord(AuditColumnsMixin, Base):
     creator = relationship("User", foreign_keys=[creator_id])
     owner = relationship("User", foreign_keys=[owner_id])
     reagent_usages = relationship("ExperimentReagentUsage", back_populates="experiment_record", cascade="all, delete-orphan")
+    participants = relationship("ExperimentRecordParticipant", back_populates="experiment_record", cascade="all, delete-orphan")
     attachments = relationship("ExperimentAttachment", back_populates="experiment_record", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -243,12 +244,28 @@ class ExperimentReagentUsage(AuditColumnsMixin, Base):
     unit: Mapped[str | None] = mapped_column(String(30), nullable=True)
     purpose: Mapped[str | None] = mapped_column(String(200), nullable=True)
     remark: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outbound_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending", default="pending")
+    shortage_qty: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    dispensed_by: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
+    dispensed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     experiment_record = relationship("ExperimentRecord", back_populates="reagent_usages")
     reagent = relationship("Reagent")
     lot = relationship("ReagentLot")
 
     __table_args__ = (Index("idx_experiment_reagent_usage_record", "experiment_record_id"),)
+
+
+class ExperimentRecordParticipant(Base):
+    __tablename__ = "experiment_record_participant"
+
+    experiment_record_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("experiment_record.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(BIGINT_ID, ForeignKey("user.id"), primary_key=True)
+
+    experiment_record = relationship("ExperimentRecord", back_populates="participants")
+    user = relationship("User")
 
 
 class ExperimentAttachment(AuditColumnsMixin, Base):
@@ -388,6 +405,9 @@ class InventoryTxn(Base):
     balance_after: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
     operator_id: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False, server_default="manual", default="manual")
+    source_id: Mapped[int | None] = mapped_column(BIGINT_ID, nullable=True)
+    shortage_qty: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     txn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     reagent_lot = relationship("ReagentLot", back_populates="inventory_txns")
