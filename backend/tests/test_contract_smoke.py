@@ -119,6 +119,37 @@ def test_main_routers_are_registered():
     assert "/api/test-methods" in route_paths
     assert "/api/test-tasks" in route_paths
     assert "/api/test-results" in route_paths
+    assert "/api/attachments" in route_paths
+
+
+def test_t1_6a_attachment_openapi_uses_unified_typed_contracts():
+    openapi = app.openapi()
+    paths = openapi["paths"]
+    schemas = openapi["components"]["schemas"]
+
+    assert "post" in paths["/api/attachments"]
+    assert "get" in paths["/api/attachments"]
+    assert "get" in paths["/api/attachments/{attachment_id}"]
+    assert "get" in paths["/api/attachments/{attachment_id}/download"]
+    assert "delete" in paths["/api/attachments/{attachment_id}"]
+    assert "/api/attachments/upload" not in paths
+
+    expected_data_refs = {
+        ("/api/attachments", "post"): "AttachmentRead",
+        ("/api/attachments/{attachment_id}", "get"): "AttachmentRead",
+        ("/api/attachments/{attachment_id}", "delete"): "AttachmentDeleteResult",
+    }
+    for (path, method), expected_data_schema in expected_data_refs.items():
+        schema = paths[path][method]["responses"][next(iter(paths[path][method]["responses"]))]["content"]["application/json"]["schema"]
+        envelope_name = schema["$ref"].rsplit("/", 1)[-1]
+        data_ref = schemas[envelope_name]["properties"]["data"]["$ref"]
+        assert data_ref.endswith(f"/{expected_data_schema}")
+
+    list_schema = paths["/api/attachments"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    list_envelope_name = list_schema["$ref"].rsplit("/", 1)[-1]
+    list_data_schema = schemas[list_envelope_name]["properties"]["data"]
+    assert list_data_schema["type"] == "array"
+    assert list_data_schema["items"]["$ref"].endswith("/AttachmentRead")
 
 
 def test_t1_5_openapi_responses_expose_typed_contracts():
