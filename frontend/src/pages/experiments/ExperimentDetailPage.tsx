@@ -1,7 +1,6 @@
 import { PageContainer } from '@ant-design/pro-components'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Alert,
   App,
   Button,
   Descriptions,
@@ -11,15 +10,19 @@ import {
   Table,
   Tabs,
   Timeline,
-  Tooltip,
   Typography,
 } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import type { ApiError } from '../../api/errors'
-import { USE_MOCK } from '../../api/runtime'
 import { useAuth } from '../../auth/useAuth'
-import { canDispenseMaterials, canEditExperiment } from '../../auth/permissions'
+import {
+  canDeleteAttachment,
+  canDispenseMaterials,
+  canEditExperiment,
+  canUploadAttachment,
+} from '../../auth/permissions'
+import { AttachmentPanel } from '../../components/attachments'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
 import { usageRoleLabel } from '../../components/status'
@@ -27,8 +30,8 @@ import { useProjectScope } from '../../hooks/useProjectScope'
 import { useUsers } from '../../hooks/useUsers'
 import { experimentService } from '../../services/experiment'
 import { projectService } from '../../services/project'
-import type { Attachment, ExperimentMaterialUsage, Id } from '../../types'
-import { formatDate, formatDateTime, formatFileSize } from '../../utils/format'
+import type { ExperimentMaterialUsage } from '../../types'
+import { formatDate, formatDateTime } from '../../utils/format'
 import ExperimentFormModal from './ExperimentFormModal'
 
 const { Paragraph, Text } = Typography
@@ -57,11 +60,6 @@ export default function ExperimentDetailPage() {
   const activitiesQuery = useQuery({
     queryKey: ['experiment', experimentId, 'activities'],
     queryFn: () => experimentService.listExperimentActivities(experimentId),
-    enabled: Number.isFinite(experimentId),
-  })
-  const attachmentsQuery = useQuery({
-    queryKey: ['experiment', experimentId, 'attachments'],
-    queryFn: () => experimentService.listExperimentAttachments(experimentId),
     enabled: Number.isFinite(experimentId),
   })
   const usagesQuery = useQuery({
@@ -123,29 +121,6 @@ export default function ExperimentDetailPage() {
     exp && exp.participant_ids.length
       ? exp.participant_ids.map((pid) => getName(pid)).join('、')
       : '—'
-
-  const attachmentColumns = [
-    { title: '文件名', dataIndex: 'original_filename', ellipsis: true },
-    { title: '类型', dataIndex: 'content_type', width: 160, render: (v: string | null) => v ?? '—' },
-    { title: '大小', dataIndex: 'file_size', width: 100, render: (v: number | null) => formatFileSize(v) },
-    { title: '上传人', dataIndex: 'uploaded_by', width: 110, render: (v: Id | null) => getName(v) },
-    { title: '上传时间', dataIndex: 'uploaded_at', width: 160, render: (v: string) => formatDateTime(v) },
-    {
-      title: '操作',
-      key: 'op',
-      width: 140,
-      render: () => (
-        <Space>
-          <Tooltip title="占位：mock 附件，暂不支持下载">
-            <a style={{ color: 'var(--ink-muted)' }}>下载</a>
-          </Tooltip>
-          <Tooltip title="占位：mock 附件，暂不支持预览">
-            <a style={{ color: 'var(--ink-muted)' }}>预览</a>
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ]
 
   return (
     <PageContainer
@@ -265,28 +240,35 @@ export default function ExperimentDetailPage() {
               {
                 key: 'attachments',
                 label: '附件/图谱',
-                children: (
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message={
-                        USE_MOCK
-                          ? '附件为 mock 占位数据，暂不支持下载/预览。'
-                          : '当前后端仅返回附件元数据，本轮不扩展真实文件上传/下载。'
-                      }
-                    />
-                    <Table<Attachment>
-                      rowKey="id"
-                      size="small"
-                      loading={attachmentsQuery.isLoading}
-                      dataSource={attachmentsQuery.data ?? []}
-                      columns={attachmentColumns}
-                      locale={{ emptyText: '暂无附件' }}
-                      pagination={false}
-                    />
-                  </Space>
-                ),
+                children: user ? (
+                  <AttachmentPanel
+                    entityType="experiment"
+                    entityId={exp.id}
+                    canUpload={canUploadAttachment(
+                      user,
+                      {
+                        entityType: 'experiment',
+                        projectId: exp.project_id,
+                        editable: exp.status !== 'archived',
+                        ownerId: exp.lead_user_id,
+                      },
+                      scope,
+                    )}
+                    canDelete={(attachment) =>
+                      canDeleteAttachment(
+                        user,
+                        attachment,
+                        {
+                          entityType: 'experiment',
+                          projectId: exp.project_id,
+                          editable: exp.status !== 'archived',
+                          ownerId: exp.lead_user_id,
+                        },
+                        scope,
+                      )
+                    }
+                  />
+                ) : null,
               },
               {
                 key: 'activity',

@@ -1,11 +1,11 @@
 import { PageContainer } from '@ant-design/pro-components'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Button, Descriptions, Empty, Space, Table, Tabs, Timeline, Typography } from 'antd'
+import { Button, Descriptions, Empty, Space, Table, Tabs, Timeline, Typography } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../auth/useAuth'
-import { USE_MOCK } from '../../api/runtime'
-import { canEditReport } from '../../auth/permissions'
+import { canDeleteAttachment, canEditReport, canUploadAttachment } from '../../auth/permissions'
+import { AttachmentPanel } from '../../components/attachments'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
 import { usageRoleLabel } from '../../components/status'
@@ -14,8 +14,8 @@ import { useUsers } from '../../hooks/useUsers'
 import { dailyReportService } from '../../services/dailyReport'
 import { experimentService } from '../../services/experiment'
 import { projectService } from '../../services/project'
-import type { Attachment, DailyReportItem, ExperimentMaterialUsage, Id } from '../../types'
-import { formatDate, formatDateTime, formatFileSize } from '../../utils/format'
+import type { DailyReportItem, ExperimentMaterialUsage, Id } from '../../types'
+import { formatDate, formatDateTime } from '../../utils/format'
 import DailyReportFormModal from './DailyReportFormModal'
 import ReportActions from './ReportActions'
 
@@ -51,11 +51,6 @@ export default function DailyReportDetailPage() {
     queryFn: () => experimentService.listMaterialUsages(report!.related_experiment_id!),
     enabled: !!report?.related_experiment_id,
   })
-  const attachmentsQuery = useQuery({
-    queryKey: ['report', reportId, 'attachments'],
-    queryFn: () => dailyReportService.listReportAttachments(reportId),
-    enabled: Number.isFinite(reportId),
-  })
   const activitiesQuery = useQuery({
     queryKey: ['report', reportId, 'activities'],
     queryFn: () => dailyReportService.listReportActivities(reportId),
@@ -79,13 +74,6 @@ export default function DailyReportDetailPage() {
       width: 100,
       render: (v: string) => <StatusTag kind="dispense" value={v} />,
     },
-  ]
-
-  const attachmentColumns = [
-    { title: '文件名', dataIndex: 'original_filename', ellipsis: true },
-    { title: '大小', dataIndex: 'file_size', width: 100, render: (v: number | null) => formatFileSize(v) },
-    { title: '上传人', dataIndex: 'uploaded_by', width: 110, render: (v: Id | null) => getName(v) },
-    { title: '上传时间', dataIndex: 'uploaded_at', width: 160, render: (v: string) => formatDateTime(v) },
   ]
 
   return (
@@ -208,28 +196,38 @@ export default function DailyReportDetailPage() {
               {
                 key: 'attachments',
                 label: '附件/图谱',
-                children: (
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message={
-                        USE_MOCK
-                          ? '附件为 mock 占位，暂不支持下载/预览。'
-                          : '当前后端仅返回附件元数据，本轮不扩展真实文件上传/下载。'
+                children:
+                  user && report.project_id != null ? (
+                    <AttachmentPanel
+                      entityType="daily_report"
+                      entityId={report.id}
+                      canUpload={canUploadAttachment(
+                        user,
+                        {
+                          entityType: 'daily_report',
+                          projectId: report.project_id,
+                          editable: report.status === 'draft' || report.status === 'returned',
+                          ownerId: report.user_id,
+                        },
+                        scope,
+                      )}
+                      canDelete={(attachment) =>
+                        canDeleteAttachment(
+                          user,
+                          attachment,
+                          {
+                            entityType: 'daily_report',
+                            projectId: report.project_id!,
+                            editable: report.status === 'draft' || report.status === 'returned',
+                            ownerId: report.user_id,
+                          },
+                          scope,
+                        )
                       }
                     />
-                    <Table<Attachment>
-                      rowKey="id"
-                      size="small"
-                      loading={attachmentsQuery.isLoading}
-                      dataSource={attachmentsQuery.data ?? []}
-                      columns={attachmentColumns}
-                      locale={{ emptyText: '暂无附件' }}
-                      pagination={false}
-                    />
-                  </Space>
-                ),
+                  ) : (
+                    <Empty description="该日报未关联唯一项目，不能上传项目归属型附件" />
+                  ),
               },
               {
                 key: 'activity',

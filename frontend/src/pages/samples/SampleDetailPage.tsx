@@ -12,7 +12,13 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import type { ApiError } from '../../api/errors'
-import { canExecuteTestTask, canManageSample } from '../../auth/permissions'
+import {
+  canDeleteAttachment,
+  canExecuteTestTask,
+  canManageSample,
+  canUploadAttachment,
+} from '../../auth/permissions'
+import { AttachmentPanel } from '../../components/attachments'
 import { useAuth } from '../../auth/useAuth'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
@@ -297,6 +303,14 @@ export default function SampleDetailPage() {
     },
   ]
 
+  const sampleAttachmentContext = sample
+    ? {
+        entityType: 'sample' as const,
+        projectId: sample.project_id,
+        editable: !['completed', 'cancelled'].includes(sample.status),
+      }
+    : null
+
   return (
     <PageContainer
       title="样品详情"
@@ -357,11 +371,63 @@ export default function SampleDetailPage() {
                         columns={columns}
                         dataSource={tasksQuery.data ?? []}
                         loading={tasksQuery.isLoading}
+                        expandable={{
+                          expandedRowRender: (task) => {
+                            const taskContext = {
+                              entityType: 'test_task' as const,
+                              projectId: task.sample.project_id,
+                              editable: !['completed', 'cancelled'].includes(task.status),
+                              assignedTo: task.assigned_to,
+                            }
+                            const resultContext = {
+                              entityType: 'test_result' as const,
+                              projectId: task.sample.project_id,
+                              editable: task.result_status === 'draft' || task.result_status === 'rejected',
+                              assignedTo: task.assigned_to,
+                            }
+                            return (
+                              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                <AttachmentPanel
+                                  entityType="test_task"
+                                  entityId={task.id}
+                                  canUpload={canUploadAttachment(user, taskContext, scope)}
+                                  canDelete={(attachment) =>
+                                    canDeleteAttachment(user, attachment, taskContext, scope)
+                                  }
+                                />
+                                {task.result_id ? (
+                                  <AttachmentPanel
+                                    entityType="test_result"
+                                    entityId={task.result_id}
+                                    canUpload={canUploadAttachment(user, resultContext, scope)}
+                                    canDelete={(attachment) =>
+                                      canDeleteAttachment(user, attachment, resultContext, scope)
+                                    }
+                                  />
+                                ) : null}
+                              </Space>
+                            )
+                          },
+                        }}
                         pagination={false}
                         scroll={{ x: 1050 }}
                         locale={{ emptyText: <SketchEmpty description="该样品暂无检测任务" /> }}
                       />
                     ),
+                  },
+                  {
+                    key: 'attachments',
+                    label: '附件',
+                    children: sampleAttachmentContext ? (
+                      <AttachmentPanel
+                        entityType="sample"
+                        entityId={sample.id}
+                        canUpload={canUploadAttachment(user, sampleAttachmentContext, scope)}
+                        canDelete={(attachment) =>
+                          canDeleteAttachment(user, attachment, sampleAttachmentContext, scope)
+                        }
+                      />
+                    ) : null,
                   },
                   {
                     key: 'info',
