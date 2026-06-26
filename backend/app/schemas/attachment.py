@@ -1,26 +1,42 @@
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import ApiResponse
 
-ATTACHMENT_ENTITIES = {"sample", "result", "experiment", "daily_log"}
-ENABLED_ATTACHMENT_ENTITIES = {"daily_log"}
+
+class AttachmentEntityType(StrEnum):
+    experiment = "experiment"
+    daily_report = "daily_report"
+    sample = "sample"
+    test_task = "test_task"
+    test_result = "test_result"
 
 
 class AttachmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    entity_type: str
+    entity_type: AttachmentEntityType
     entity_id: int
-    file_name: str
+    project_id: int
+    original_filename: str
     storage_key: str
-    file_type: str | None = None
-    content_type_detected: str | None = None
-    file_size: int | None = None
-    sha256: str | None = None
-    thumbnail_key: str | None = None
-    upload_status: str
-    preview_status: str | None = None
+    content_type: str
+    file_size: int
+    checksum_sha256: str
+    storage_backend: str
     uploaded_by: int | None = None
     uploaded_at: datetime
+    deleted_at: datetime | None = None
+
+
+class AttachmentDeleteResult(BaseModel):
+    id: int
+    deleted: bool = True
+
+
+AttachmentResponse = ApiResponse[AttachmentRead]
+AttachmentListResponse = ApiResponse[list[AttachmentRead]]
+AttachmentDeleteResponse = ApiResponse[AttachmentDeleteResult]

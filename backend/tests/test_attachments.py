@@ -1,4 +1,5 @@
 from datetime import date
+import asyncio
 
 import pytest
 from fastapi import HTTPException
@@ -7,11 +8,35 @@ from app.models.business import Attachment, Project
 from app.models.business import DailyReport, DailyReportItem, ExperimentRecord, ExperimentRecordParticipant
 from app.models.business import ProjectMember, Result, Sample, SampleTest, TestMethod as LimsTestMethod
 from app.services import storage as storage_module
+from app.services import attachments as attachment_service
 
 try:
     from app.services import attachment_entities as attachment_entities_module
 except ImportError:
     attachment_entities_module = None
+
+
+class FakeUploadFile:
+    def __init__(self, filename: str, content: bytes, content_type: str | None = None):
+        self.filename = filename
+        self.content_type = content_type
+        self._content = content
+
+    async def read(self) -> bytes:
+        return self._content
+
+
+def _upload(db_session, user, entity_type, entity_id, file_name, content, content_type, storage):
+    return asyncio.run(
+        attachment_service.upload_attachment(
+            db_session,
+            user,
+            entity_type,
+            entity_id,
+            FakeUploadFile(file_name, content, content_type),
+            storage=storage,
+        )
+    )
 
 
 def test_attachment_persists_t1_6a_project_scoped_contract(db_session, create_user):
@@ -223,3 +248,119 @@ def test_attachment_entity_resolver_enforces_role_permissions(db_session, create
     with pytest.raises(HTTPException) as operator_other_task:
         _resolve(db_session, context["operator"], "test_task", context["other_task"].id, action="read")
     assert operator_other_task.value.status_code == 404
+
+
+def test_upload_list_detail_download_and_soft_delete(db_session, create_user, tmp_path):
+    context = _attachment_context(db_session, create_user)
+    storage = storage_module.LocalAttachmentStorage(tmp_path)
+    content = b"%PDF-1.4\nattachment"
+
+    attachment = _upload(
+        db_session,
+        context["manager"],
+        "sample",
+        context["sample"].id,
+        "report.pdf",
+        content,
+        "application/pdf",
+        storage,
+    )
+
+    assert attachment.project_id == context["project"].id
+    assert attachment.original_filename == "report.pdf"
+    assert attachment.content_type == "application/pdf"
+    assert attachment.file_size == len(content)
+    assert attachment.checksum_sha256
+    assert attachment.storage_backend == "local"
+    assert storage.exists(attachment.storage_key)
+
+    listed = attachment_service.list_attachments(db_session, context["manager"], "sample", context["sample"].id)
+    assert [item.id for item in listed] == [attachment.id]
+    assert attachment_service.get_attachment(db_session, context["manager"], attachment.id).id == attachment.id
+
+    download_attachment, downloaded = attachment_service.download_attachment(
+        db_session, context["manager"], attachment.id, storage=storage
+    )
+    assert download_attachment.original_filename == "report.pdf"
+    assert downloaded == content
+
+    deleted = attachment_service.delete_attachment(db_session, context["manager"], attachment.id)
+    assert deleted.id == attachment.id
+    assert deleted.deleted is True
+    with pytest.raises(HTTPException) as deleted_download:
+        attachment_service.download_attachment(db_session, context["manager"], attachment.id, storage=storage)
+    assert deleted_download.value.status_code == 404
+
+
+def test_upload_security_rejects_oversized_dangerous_mime_html_and_traversal(db_session, create_user, tmp_path, monkeypatch):
+    context = _attachment_context(db_session, create_user)
+    storage = storage_module.LocalAttachmentStorage(tmp_path)
+
+    monkeypatch.setattr("app.services.attachments.settings.attachment_max_size_bytes", 4)
+    with pytest.raises(HTTPException) as oversized:
+        _upload(db_session, context["manager"], "sample", context["sample"].id, "small.txt", b"12345", "text/plain", storage)
+    assert oversized.value.status_code == 413
+    monkeypatch.setattr("app.services.attachments.settings.attachment_max_size_bytes", 20 * 1024 * 1024)
+
+    cases = [
+        ("script.exe", b"MZ", "application/octet-stream"),
+        ("note.txt", b"plain", "text/html"),
+        ("note.txt", b"<!doctype html><html></html>", "text/plain"),
+        ("../report.pdf", b"%PDF-1.4", "application/pdf"),
+        ("C:\\report.pdf", b"%PDF-1.4", "application/pdf"),
+        ("bad\x00name.pdf", b"%PDF-1.4", "application/pdf"),
+    ]
+    for file_name, content, content_type in cases:
+        with pytest.raises(HTTPException):
+            _upload(db_session, context["manager"], "sample", context["sample"].id, file_name, content, content_type, storage)
+
+
+def test_repeated_original_filename_never_overwrites(db_session, create_user, tmp_path):
+    context = _attachment_context(db_session, create_user)
+    storage = storage_module.LocalAttachmentStorage(tmp_path)
+
+    first = _upload(db_session, context["manager"], "sample", context["sample"].id, "report.pdf", b"%PDF-1.4\nfirst", "application/pdf", storage)
+    second = _upload(db_session, context["manager"], "sample", context["sample"].id, "report.pdf", b"%PDF-1.4\nsecond", "application/pdf", storage)
+
+    assert first.original_filename == second.original_filename == "report.pdf"
+    assert first.storage_key != second.storage_key
+    assert storage.read(first.storage_key) == b"%PDF-1.4\nfirst"
+    assert storage.read(second.storage_key) == b"%PDF-1.4\nsecond"
+
+
+def test_stored_project_mismatch_and_operator_delete_other_upload_are_rejected(db_session, create_user, tmp_path):
+    context = _attachment_context(db_session, create_user)
+    storage = storage_module.LocalAttachmentStorage(tmp_path)
+    manager_upload = _upload(
+        db_session,
+        context["manager"],
+        "sample",
+        context["sample"].id,
+        "manager.txt",
+        b"manager",
+        "text/plain",
+        storage,
+    )
+
+    with pytest.raises(HTTPException) as operator_delete:
+        attachment_service.delete_attachment(db_session, context["operator"], manager_upload.id)
+    assert operator_delete.value.status_code == 403
+
+    bad_attachment = Attachment(
+        entity_type="sample",
+        entity_id=context["sample"].id,
+        project_id=context["other_project"].id,
+        original_filename="bad.txt",
+        storage_key=storage.save(b"bad", ".txt"),
+        content_type="text/plain",
+        file_size=3,
+        checksum_sha256="b" * 64,
+        storage_backend="local",
+        uploaded_by=context["manager"].id,
+    )
+    db_session.add(bad_attachment)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as project_mismatch:
+        attachment_service.get_attachment(db_session, context["manager"], bad_attachment.id)
+    assert project_mismatch.value.status_code in {403, 404}
