@@ -1,4 +1,4 @@
-import type { DailyReport, Experiment, Id, Project, Role, User } from '../types'
+import type { AttachmentEntity, DailyReport, Experiment, Id, Project, Role, User } from '../types'
 import type { ResultStatus, TaskStatus } from '../types'
 
 /** 角色中文标签（operator 显示为「操作员」，值仍为 operator）。 */
@@ -157,6 +157,44 @@ export function canReviewTestResult(
   if (resultStatus !== 'submitted') return false
   if (user.role === 'admin') return true
   return user.role === 'project_manager' && scope.managed.has(projectId)
+}
+
+// ---------- 附件权限（T1.6A） ----------
+
+export interface AttachmentObjectContext {
+  entityType: AttachmentEntity
+  projectId: Id
+  editable: boolean
+  ownerId?: Id | null
+  assignedTo?: Id | null
+}
+
+export interface AttachmentLike {
+  uploaded_by?: Id | null
+}
+
+export function canUploadAttachment(
+  user: Pick<User, 'id' | 'role'>,
+  context: AttachmentObjectContext,
+  scope: ProjectScope,
+): boolean {
+  if (!context.editable) return false
+  if (user.role === 'director') return false
+  if (user.role === 'admin') return true
+  if (user.role === 'project_manager') return scope.managed.has(context.projectId)
+  if (context.assignedTo != null) return context.assignedTo === user.id
+  if (context.ownerId != null) return context.ownerId === user.id
+  return scope.member.has(context.projectId)
+}
+
+export function canDeleteAttachment(
+  user: Pick<User, 'id' | 'role'>,
+  attachment: AttachmentLike,
+  context: AttachmentObjectContext,
+  scope: ProjectScope,
+): boolean {
+  if (user.role === 'operator' && attachment.uploaded_by !== user.id) return false
+  return canUploadAttachment(user, context, scope)
 }
 
 // ---------- 日报权限 ----------

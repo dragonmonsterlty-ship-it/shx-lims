@@ -3,7 +3,14 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { canExecuteTestTask, canManageSample, canReviewTestResult, roleLabel } from './permissions'
+import {
+  canDeleteAttachment,
+  canExecuteTestTask,
+  canManageSample,
+  canReviewTestResult,
+  canUploadAttachment,
+  roleLabel,
+} from './permissions'
 import { normalizeRole } from '../api/adapters'
 
 describe('role terminology', () => {
@@ -43,5 +50,35 @@ describe('role terminology', () => {
     expect(canExecuteTestTask(analyst, { assigned_to: 8, status: 'pending' })).toBe(false)
     expect(canReviewTestResult(manager, 10, 'submitted', scope)).toBe(true)
     expect(canReviewTestResult(viewer, 10, 'submitted', scope)).toBe(false)
+  })
+
+  it('enforces T1.6A attachment upload and delete capabilities', () => {
+    const admin = { id: 1, role: 'admin' as const }
+    const manager = { id: 2, role: 'project_manager' as const }
+    const operator = { id: 3, role: 'operator' as const }
+    const director = { id: 4, role: 'director' as const }
+    const scope = { managed: new Set([10]), member: new Set([10]) }
+    const editableContext = {
+      entityType: 'test_task' as const,
+      projectId: 10,
+      editable: true,
+      assignedTo: 3,
+    }
+    const otherProjectContext = { ...editableContext, projectId: 99 }
+    const attachment = { id: 7, uploaded_by: 3 }
+    const managerAttachment = { id: 8, uploaded_by: 2 }
+
+    expect(canUploadAttachment(admin, editableContext, scope)).toBe(true)
+    expect(canUploadAttachment(manager, editableContext, scope)).toBe(true)
+    expect(canUploadAttachment(manager, otherProjectContext, scope)).toBe(false)
+    expect(canUploadAttachment(operator, editableContext, scope)).toBe(true)
+    expect(canUploadAttachment(director, editableContext, scope)).toBe(false)
+    expect(canUploadAttachment(operator, { ...editableContext, editable: false }, scope)).toBe(false)
+
+    expect(canDeleteAttachment(admin, managerAttachment, editableContext, scope)).toBe(true)
+    expect(canDeleteAttachment(manager, managerAttachment, editableContext, scope)).toBe(true)
+    expect(canDeleteAttachment(operator, attachment, editableContext, scope)).toBe(true)
+    expect(canDeleteAttachment(operator, managerAttachment, editableContext, scope)).toBe(false)
+    expect(canDeleteAttachment(director, attachment, editableContext, scope)).toBe(false)
   })
 })
