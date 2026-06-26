@@ -1,3 +1,6 @@
+import { clientFileValidationMessage } from './AttachmentPanel.validation'
+
+export { clientFileValidationMessage }
 import { DownloadOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Popconfirm, Progress, Space, Table, Typography, Upload, message } from 'antd'
@@ -11,22 +14,11 @@ import {
 } from '../../services/attachment'
 import type { Attachment, AttachmentEntity, Id } from '../../types'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
-const BLOCKED_EXTENSIONS = new Set(['exe', 'bat', 'cmd', 'ps1', 'sh', 'js', 'mjs', 'cjs', 'html', 'htm'])
-
 export interface AttachmentPanelProps {
   entityType: AttachmentEntity
   entityId: Id
   canUpload: boolean
   canDelete: (attachment: Attachment) => boolean
-}
-
-export function clientFileValidationMessage(file: Pick<File, 'name' | 'size'>): string | null {
-  if (file.size > MAX_FILE_SIZE) return '单个文件不超过 20 MB'
-  const extension = file.name.split('.').pop()?.toLowerCase()
-  if (!extension) return '文件必须包含扩展名'
-  if (BLOCKED_EXTENSIONS.has(extension)) return `不允许上传 .${extension} 类型文件`
-  return null
 }
 
 export function AttachmentPanel({
