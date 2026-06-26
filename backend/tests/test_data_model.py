@@ -7,6 +7,7 @@ from pathlib import Path
 
 from sqlalchemy import inspect
 
+from app.core.config import settings
 from app.db.base import Base
 from app.models.business import (
     Attachment,
@@ -61,6 +62,36 @@ def test_data_model_tables_are_registered():
     }.issubset(Base.metadata.tables["result"].c.keys())
 
 
+def test_attachment_model_uses_t1_6a_canonical_contract():
+    attachment_columns = set(Base.metadata.tables["attachment"].c.keys())
+
+    assert {
+        "id",
+        "entity_type",
+        "entity_id",
+        "project_id",
+        "original_filename",
+        "storage_key",
+        "content_type",
+        "file_size",
+        "checksum_sha256",
+        "storage_backend",
+        "uploaded_by",
+        "uploaded_at",
+        "deleted_at",
+    }.issubset(attachment_columns)
+    assert "file_name" not in attachment_columns
+    assert "sha256" not in attachment_columns
+    assert "content_type_detected" not in attachment_columns
+
+
+def test_attachment_settings_default_to_local_storage_contract():
+    assert settings.attachment_max_size_bytes == 20 * 1024 * 1024
+    assert settings.attachment_storage_backend == "local"
+    assert settings.attachment_storage_root
+    assert "exe" in settings.attachment_blocked_extension_set
+
+
 def test_data_model_minimal_insert_graph(db_session, create_user):
     user = create_user(username="manager", role="project_manager", must_change_password=False)
 
@@ -99,7 +130,18 @@ def test_data_model_minimal_insert_graph(db_session, create_user):
     result = Result(sample_test_id=sample_test.id, value_num=Decimal("99.500000"), entered_by=user.id, created_by=user.id)
     material = ExperimentMaterial(experiment_id=experiment.id, material_name="Methanol", reagent_lot_id=lot.id, created_by=user.id)
     txn = InventoryTxn(reagent_lot_id=lot.id, txn_type="in", quantity=Decimal("50.0000"), balance_after=Decimal("50.0000"), operator_id=user.id)
-    attachment = Attachment(entity_type="sample", entity_id=sample.id, file_name="spectrum.png", storage_key="uuid/spectrum.png", uploaded_by=user.id)
+    attachment = Attachment(
+        entity_type="sample",
+        entity_id=sample.id,
+        project_id=project.id,
+        original_filename="spectrum.png",
+        storage_key="uuid/spectrum.png",
+        content_type="image/png",
+        file_size=12,
+        checksum_sha256="0" * 64,
+        storage_backend="local",
+        uploaded_by=user.id,
+    )
     audit_log = AuditLog(table_name="sample", record_id=sample.id, action="create", changed_by=user.id, new_value={"sample_code": sample.sample_code})
     db_session.add_all([result, material, txn, attachment, audit_log])
     db_session.commit()

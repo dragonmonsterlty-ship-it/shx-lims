@@ -457,21 +457,25 @@ class Attachment(Base):
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_id: Mapped[int] = mapped_column(BIGINT_ID, nullable=False)
-    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_id: Mapped[int] = mapped_column(BIGINT_ID, ForeignKey("project.id"), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
-    file_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    content_type_detected: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    file_size: Mapped[int | None] = mapped_column(BIGINT_ID, nullable=True)
-    sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    thumbnail_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    upload_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="uploaded", default="uploaded")
-    preview_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    file_size: Mapped[int] = mapped_column(BIGINT_ID, nullable=False)
+    checksum_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="local", server_default="local")
     uploaded_by: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    project = relationship("Project", foreign_keys=[project_id])
     uploader = relationship("User", foreign_keys=[uploaded_by])
 
-    __table_args__ = (Index("idx_attachment_entity", "entity_type", "entity_id"),)
+    __table_args__ = (
+        Index("idx_attachment_entity", "entity_type", "entity_id"),
+        Index("idx_attachment_active_entity", "entity_type", "entity_id", "deleted_at"),
+        Index("idx_attachment_project", "project_id"),
+    )
 
 
 class AuditLog(Base):

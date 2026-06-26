@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     upload_max_size_bytes: int = 20 * 1024 * 1024
     upload_allowed_extensions: str = "jpg,jpeg,png,pdf,csv,xlsx,xls"
 
+    attachment_storage_root: str = "storage/attachments"
+    attachment_storage_backend: str = "local"
+    attachment_max_size_bytes: int = 20 * 1024 * 1024
+    attachment_allowed_extensions: str = "jpg,jpeg,png,pdf,txt,csv,xlsx,xls,docx,doc"
+    attachment_blocked_extensions: str = "exe,bat,cmd,ps1,sh,js,mjs,cjs,html,htm"
+    attachment_blocked_mime_types: str = (
+        "application/x-msdownload,application/x-executable,"
+        "application/x-sh,text/x-shellscript,text/html,"
+        "application/javascript,text/javascript"
+    )
+
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
@@ -36,6 +47,32 @@ class Settings(BaseSettings):
     @property
     def upload_allowed_extension_set(self) -> set[str]:
         return {extension.strip().lower().lstrip(".") for extension in self.upload_allowed_extensions.split(",") if extension.strip()}
+
+    @property
+    def attachment_allowed_extension_set(self) -> set[str]:
+        return {
+            extension.strip().lower().lstrip(".")
+            for extension in self.attachment_allowed_extensions.split(",")
+            if extension.strip()
+        }
+
+    @property
+    def attachment_blocked_extension_set(self) -> set[str]:
+        return {
+            extension.strip().lower().lstrip(".")
+            for extension in self.attachment_blocked_extensions.split(",")
+            if extension.strip()
+        }
+
+    @property
+    def attachment_blocked_mime_type_set(self) -> set[str]:
+        return {mime.strip().lower() for mime in self.attachment_blocked_mime_types.split(",") if mime.strip()}
+
+    @model_validator(mode="after")
+    def validate_attachment_storage_backend(self) -> "Settings":
+        if self.attachment_storage_backend != "local":
+            raise ValueError("T1.6A attachments only support local storage backend")
+        return self
 
 
 @lru_cache
