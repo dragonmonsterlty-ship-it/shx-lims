@@ -3,7 +3,6 @@
 
 import dayjs from 'dayjs'
 
-import type { Attachment } from '../../types/attachment'
 import type { User } from '../../types/auth'
 import type { DailyReport, DailyReportActivity } from '../../types/dailyReport'
 import type {
@@ -184,12 +183,4 @@ export const experimentMaterialUsages: ExperimentMaterialUsage[] = [
   { id: 7402, experiment_id: 601, material_id: 7105, material_code: 'M-SOL-001', material_name: '二氯甲烷', batch_id: 7206, batch_no: 'DCM-2406', usage_role: 'solvent', planned_qty: 100, actual_qty: 100, unit: 'mL', stock_available: 4000, stock_status: 'sufficient', outbound_status: 'dispensed', shortage_qty: null, remark: '' },
   { id: 7403, experiment_id: 602, material_id: 7103, material_code: 'M-RG-001', material_name: '三乙胺', batch_id: 7204, batch_no: 'TEA-2403', usage_role: 'reagent', planned_qty: 10, actual_qty: 12, unit: 'mL', stock_available: 500, stock_status: 'sufficient', outbound_status: 'pending', shortage_qty: null, remark: '待出库' },
   { id: 7404, experiment_id: 602, material_id: 7107, material_code: 'M-CAT-001', material_name: '钯碳 Pd/C', batch_id: 7209, batch_no: 'PdC-2401', usage_role: 'catalyst', planned_qty: 8, actual_qty: 8, unit: 'g', stock_available: 5, stock_status: 'insufficient', outbound_status: 'pending', shortage_qty: null, remark: '库存可能不足' },
-]
-
-export const attachments: Attachment[] = [
-  { id: 1001, entity_type: 'daily_report', entity_id: 8001, file_name: 'A-含量-线性谱图.png', storage_key: 'mock/uuid-1001', file_type: 'image/png', content_type_detected: 'image/png', file_size: 245_000, sha256: null, thumbnail_key: null, upload_status: 'uploaded', preview_status: 'ready', uploaded_by: 4, uploaded_at: iso(now.subtract(1, 'day')) },
-  { id: 1002, entity_type: 'daily_report', entity_id: 8004, file_name: 'C-中控-LCMS.pdf', storage_key: 'mock/uuid-1002', file_type: 'application/pdf', content_type_detected: 'application/pdf', file_size: 1_200_000, sha256: null, thumbnail_key: null, upload_status: 'uploaded', preview_status: null, uploaded_by: 5, uploaded_at: iso(now.subtract(1, 'day')) },
-  { id: 1003, entity_type: 'experiment', entity_id: 601, file_name: 'A-001-HPLC图谱.png', storage_key: 'mock/uuid-1003', file_type: 'image/png', content_type_detected: 'image/png', file_size: 320_000, sha256: null, thumbnail_key: null, upload_status: 'uploaded', preview_status: 'ready', uploaded_by: 4, uploaded_at: iso(now.subtract(10, 'day')) },
-  { id: 1004, entity_type: 'experiment', entity_id: 601, file_name: 'A-001-降解-LCMS报告.pdf', storage_key: 'mock/uuid-1004', file_type: 'application/pdf', content_type_detected: 'application/pdf', file_size: 980_000, sha256: null, thumbnail_key: null, upload_status: 'uploaded', preview_status: null, uploaded_by: 4, uploaded_at: iso(now.subtract(10, 'day')) },
-  { id: 1005, entity_type: 'experiment', entity_id: 608, file_name: 'D-路线A-NMR.pdf', storage_key: 'mock/uuid-1005', file_type: 'application/pdf', content_type_detected: 'application/pdf', file_size: 1_500_000, sha256: null, thumbnail_key: null, upload_status: 'uploaded', preview_status: null, uploaded_by: 3, uploaded_at: iso(now.subtract(20, 'day')) },
 ]

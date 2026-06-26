@@ -1,5 +1,4 @@
 import type {
-  Attachment,
   BatchInput,
   DailyReport,
   DailyReportInput,
@@ -412,27 +411,6 @@ export function adaptTestResult(raw: BackendTestResult): Result & ResultRow {
   }
 }
 
-function adaptAttachment(
-  raw: BackendAttachment,
-  entityType: 'experiment' | 'daily_report',
-  entityId: Id,
-): Attachment {
-  return {
-    id: raw.id,
-    entity_type: entityType,
-    entity_id: entityId,
-    file_name: raw.file_name,
-    storage_key: raw.storage_key ?? '',
-    file_type: raw.file_type ?? null,
-    content_type_detected: raw.file_type ?? null,
-    file_size: raw.file_size ?? null,
-    upload_status: 'uploaded',
-    preview_status: null,
-    uploaded_by: raw.uploaded_by ?? null,
-    uploaded_at: raw.created_at ?? '',
-  }
-}
-
 function adaptExperimentUsage(raw: BackendExperimentUsage): ExperimentMaterialUsage {
   const quantity = raw.quantity == null ? null : toNumber(raw.quantity)
   return {
@@ -483,7 +461,7 @@ export function adaptExperiment(raw: BackendExperiment): Experiment {
     next_step: raw.next_step ?? null,
     risk_note: raw.risk_note ?? null,
     material_usages: raw.reagent_usages?.map(adaptExperimentUsage) ?? [],
-    attachments: raw.attachments?.map((item) => adaptAttachment(item, 'experiment', raw.id)) ?? [],
+    attachments: [],
     attachment_count: raw.attachment_count,
     reagent_usage_count: raw.reagent_usage_count,
     is_deleted: false,
@@ -511,7 +489,7 @@ export function adaptDailyReport(raw: BackendDailyReport): DailyReport {
     reviewed_at: raw.reviewed_at ?? null,
     review_comment: raw.review_comment ?? null,
     items: raw.items ?? [],
-    attachments: raw.attachments?.map((item) => adaptAttachment(item, 'daily_report', raw.id)) ?? [],
+    attachments: [],
     item_count: raw.item_count,
     project_count: raw.project_count,
     experiment_record_count: raw.experiment_record_count,

@@ -3,7 +3,6 @@
 
 import dayjs from 'dayjs'
 
-import type { Attachment, AttachmentEntity } from '../../types/attachment'
 import type { LoginResponse, Role, User } from '../../types/auth'
 import type { ApiEnvelope, Id, PageResult } from '../../types/common'
 import type {
@@ -346,49 +345,6 @@ export const mockServer = {
         .filter((a) => a.report_id === reportId)
         .sort((a, b) => (a.at < b.at ? 1 : -1))
       return ok(rows)
-    },
-  },
-
-  // ---------- attachments ----------
-  attachments: {
-    listByEntity(
-      entityType: AttachmentEntity,
-      entityId: Id,
-    ): Promise<ApiEnvelope<Attachment[]>> {
-      return ok(
-        db.attachments.filter((a) => a.entity_type === entityType && a.entity_id === entityId),
-      )
-    },
-    upload(
-      entityType: AttachmentEntity,
-      entityId: Id,
-      file: { name: string; size: number; type: string },
-      actorId: Id,
-    ): Promise<ApiEnvelope<Attachment>> {
-      const att: Attachment = {
-        id: db.nextId(),
-        entity_type: entityType,
-        entity_id: entityId,
-        file_name: file.name,
-        storage_key: `mock/${crypto.randomUUID?.() ?? Date.now()}`,
-        file_type: file.type || null,
-        content_type_detected: file.type || null,
-        file_size: file.size,
-        sha256: null,
-        thumbnail_key: null,
-        upload_status: 'uploaded',
-        preview_status: file.type.startsWith('image/') ? 'ready' : null,
-        uploaded_by: actorId,
-        uploaded_at: dayjs().toISOString(),
-      }
-      db.attachments.push(att)
-      return ok(att)
-    },
-    remove(id: Id): Promise<ApiEnvelope<{ deleted: boolean }>> {
-      const idx = db.attachments.findIndex((a) => a.id === id)
-      if (idx < 0) return fail(404, '附件不存在')
-      db.attachments.splice(idx, 1)
-      return ok({ deleted: true })
     },
   },
 

@@ -9,6 +9,7 @@ import { createApiError } from '../api/errors'
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
 import { mockServer } from '../api/mock'
+import { listAttachments } from './attachment'
 import type {
   Attachment,
   DailyReport,
@@ -118,8 +119,7 @@ export async function listReportActivities(id: Id): Promise<DailyReportActivity[
 }
 
 export async function listReportAttachments(id: Id): Promise<Attachment[]> {
-  if (USE_MOCK) return unwrap(await mockServer.attachments.listByEntity('daily_report', id))
-  return (await getReport(id)).attachments ?? []
+  return listAttachments('daily_report', id)
 }
 
 /** 归档日报（real 模式接后端 /archive；mock 暂不支持）。 */

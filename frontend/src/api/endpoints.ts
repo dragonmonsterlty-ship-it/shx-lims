@@ -29,7 +29,7 @@ export const endpoints = {
     archive: (id: number) => `/daily-reports/${id}/archive`,
   },
   attachments: {
-    upload: '/attachments/upload',
+    root: '/attachments',
     detail: (id: number) => `/attachments/${id}`,
     download: (id: number) => `/attachments/${id}/download`,
   },

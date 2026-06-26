@@ -125,8 +125,8 @@ export default function ExperimentDetailPage() {
       : '—'
 
   const attachmentColumns = [
-    { title: '文件名', dataIndex: 'file_name', ellipsis: true },
-    { title: '类型', dataIndex: 'content_type_detected', width: 160, render: (v: string | null) => v ?? '—' },
+    { title: '文件名', dataIndex: 'original_filename', ellipsis: true },
+    { title: '类型', dataIndex: 'content_type', width: 160, render: (v: string | null) => v ?? '—' },
     { title: '大小', dataIndex: 'file_size', width: 100, render: (v: number | null) => formatFileSize(v) },
     { title: '上传人', dataIndex: 'uploaded_by', width: 110, render: (v: Id | null) => getName(v) },
     { title: '上传时间', dataIndex: 'uploaded_at', width: 160, render: (v: string) => formatDateTime(v) },

@@ -9,6 +9,7 @@ import { createApiError } from '../api/errors'
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
 import { mockServer } from '../api/mock'
+import { listAttachments } from './attachment'
 import type {
   Attachment,
   Experiment,
@@ -106,8 +107,7 @@ export async function listExperimentActivities(id: Id): Promise<ExperimentActivi
 }
 
 export async function listExperimentAttachments(id: Id): Promise<Attachment[]> {
-  if (USE_MOCK) return unwrap(await mockServer.attachments.listByEntity('experiment', id))
-  return (await getExperiment(id)).attachments ?? []
+  return listAttachments('experiment', id)
 }
 
 export async function listMaterialUsages(id: Id): Promise<ExperimentMaterialUsage[]> {
