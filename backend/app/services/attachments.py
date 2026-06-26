@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.models.business import Attachment
 from app.models.user import User
 from app.schemas.attachment import AttachmentDeleteResult
+from app.services.audit_logs import record_audit
 from app.services.attachment_entities import resolve_attachment_entity
 from app.services.storage import AttachmentStorage, get_attachment_storage
 
@@ -129,6 +130,22 @@ async def upload_attachment(
     )
     db.add(attachment)
     try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="upload",
+            entity_type="attachment",
+            entity_id=attachment.id,
+            project_id=attachment.project_id,
+            after_data={
+                "id": attachment.id,
+                "entity_type": attachment.entity_type,
+                "entity_id": attachment.entity_id,
+                "original_filename": attachment.original_filename,
+                "file_size": attachment.file_size,
+            },
+        )
         db.commit()
     except SQLAlchemyError:
         db.rollback()
@@ -167,7 +184,18 @@ def download_attachment(
 ) -> tuple[Attachment, bytes]:
     attachment = get_attachment(db, current_user, attachment_id)
     attachment_storage = storage or get_attachment_storage()
-    return attachment, attachment_storage.read(attachment.storage_key)
+    content = attachment_storage.read(attachment.storage_key)
+    record_audit(
+        db,
+        current_user,
+        action="download",
+        entity_type="attachment",
+        entity_id=attachment.id,
+        project_id=attachment.project_id,
+        after_data={"id": attachment.id, "original_filename": attachment.original_filename},
+    )
+    db.commit()
+    return attachment, content
 
 
 def delete_attachment(db: Session, current_user: User, attachment_id: int) -> AttachmentDeleteResult:
@@ -176,6 +204,16 @@ def delete_attachment(db: Session, current_user: User, attachment_id: int) -> At
     if current_user.role == "operator" and attachment.uploaded_by != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operators can delete only their own attachments")
     attachment.deleted_at = datetime.now(UTC)
+    record_audit(
+        db,
+        current_user,
+        action="delete",
+        entity_type="attachment",
+        entity_id=attachment.id,
+        project_id=attachment.project_id,
+        before_data={"deleted_at": None, "original_filename": attachment.original_filename},
+        after_data={"deleted_at": attachment.deleted_at},
+    )
     db.commit()
     return AttachmentDeleteResult(id=attachment.id, deleted=True)
 

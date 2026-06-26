@@ -1,13 +1,16 @@
 from fastapi import APIRouter
 
-from app.api import attachments, auth, daily_logs, daily_reports, experiment_records, health, projects, reagents, testing, users
+from app.api import admin_users, attachments, audit_logs, auth, daily_logs, daily_reports, experiment_records, experiments, health, projects, reagents, testing, users
 
 
 api_router = APIRouter()
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(admin_users.router, prefix="/admin", tags=["admin"])
+api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit_logs"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
+api_router.include_router(experiments.router, prefix="/experiments", tags=["experiments"])
 api_router.include_router(experiment_records.router, prefix="/experiment-records", tags=["experiment_records"])
 api_router.include_router(daily_logs.router, prefix="/daily-logs", tags=["daily_logs"])
 api_router.include_router(daily_reports.router, prefix="/daily-reports", tags=["daily_reports"])

@@ -6,6 +6,7 @@ from app.core.deps import CurrentUser, DbSession
 from app.schemas.common import api_response
 from app.schemas.daily_report import DailyReportCreate, DailyReportDetail, DailyReportPage, DailyReportReview, DailyReportReturn, DailyReportUpdate
 from app.services import daily_reports as report_service
+from app.services import audit_logs as audit_service
 
 
 router = APIRouter()
@@ -54,6 +55,11 @@ def read_daily_report(report_id: int, db: DbSession, current_user: CurrentUser) 
     report_service.ensure_can_view_report(db, current_user, report)
     detail = report_service.serialize_report_detail(report)
     return api_response(DailyReportDetail.model_validate(detail).model_dump())
+
+
+@router.get("/{report_id}/timeline")
+def read_daily_report_timeline(report_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "daily_report", report_id))
 
 
 @router.patch("/{report_id}")

@@ -30,6 +30,7 @@ from app.schemas.experiment_record import (
     ExperimentRecordUpdate,
     ExperimentReagentUsageCreate,
 )
+from app.services.audit_logs import capture, record_audit
 from app.services.projects import get_existing_project, is_project_manager, is_project_member, user_brief
 
 
@@ -264,6 +265,16 @@ def create_record(db: Session, current_user: User, payload: ExperimentRecordCrea
     record.attachments = [_build_attachment(attachment, current_user.id) for attachment in payload.attachments]
     db.add(record)
     try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="create",
+            entity_type="experiment",
+            entity_id=record.id,
+            project_id=record.project_id,
+            after_data={"id": record.id, "code": record.code, "status": record.status, "title": record.title},
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -275,6 +286,7 @@ def update_record(db: Session, current_user: User, record_id: int, payload: Expe
     record = get_record_or_404(db, record_id)
     ensure_can_view_record(db, current_user, record)
     ensure_can_edit_record(db, current_user, record)
+    before = capture(serialize_record_detail(record))
     updates = payload.model_dump(exclude_unset=True)
     if "record_type" in updates and updates["record_type"] is not None:
         ensure_record_type(updates["record_type"])
@@ -298,6 +310,17 @@ def update_record(db: Session, current_user: User, record_id: int, payload: Expe
         record.participants = _participant_rows(db, record.project_id, payload.participant_ids or [])
     record.updated_by = current_user.id
     try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="update",
+            entity_type="experiment",
+            entity_id=record.id,
+            project_id=record.project_id,
+            before_data=before,
+            after_data=serialize_record_detail(record),
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -317,8 +340,20 @@ def submit_record(db: Session, current_user: User, record_id: int) -> Experiment
     ensure_can_submit_record(db, current_user, record)
     if record.status not in {"draft", "in_progress"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only draft or in_progress records can be submitted")
+    before = capture({"status": record.status})
     record.status = "submitted"
     record.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="submit",
+        entity_type="experiment",
+        entity_id=record.id,
+        project_id=record.project_id,
+        before_data=before,
+        after_data={"status": record.status},
+    )
     db.commit()
     return get_record_or_404(db, record.id)
 
@@ -326,8 +361,20 @@ def submit_record(db: Session, current_user: User, record_id: int) -> Experiment
 def archive_record(db: Session, current_user: User, record_id: int) -> ExperimentRecord:
     ensure_can_archive_record(current_user)
     record = get_record_or_404(db, record_id)
+    before = capture({"status": record.status})
     record.status = "archived"
     record.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="archive",
+        entity_type="experiment",
+        entity_id=record.id,
+        project_id=record.project_id,
+        before_data=before,
+        after_data={"status": record.status},
+    )
     db.commit()
     return get_record_or_404(db, record.id)
 

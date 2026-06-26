@@ -6,6 +6,7 @@ from app.core.deps import CurrentUser, DbSession
 from app.schemas.common import api_response
 from app.schemas.experiment_record import ExperimentRecordCreate, ExperimentRecordDetail, ExperimentRecordPage, ExperimentRecordUpdate
 from app.services import experiment_records as record_service
+from app.services import audit_logs as audit_service
 
 
 router = APIRouter()
@@ -55,6 +56,11 @@ def list_experiment_records(
 def read_experiment_record(record_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     detail = record_service.read_record_detail(db, current_user, record_id)
     return api_response(ExperimentRecordDetail.model_validate(detail).model_dump())
+
+
+@router.get("/{record_id}/timeline")
+def read_experiment_record_timeline(record_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "experiment", record_id))
 
 
 @router.patch("/{record_id}")

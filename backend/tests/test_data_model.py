@@ -142,7 +142,15 @@ def test_data_model_minimal_insert_graph(db_session, create_user):
         storage_backend="local",
         uploaded_by=user.id,
     )
-    audit_log = AuditLog(table_name="sample", record_id=sample.id, action="create", changed_by=user.id, new_value={"sample_code": sample.sample_code})
+    audit_log = AuditLog(
+        actor_user_id=user.id,
+        actor_role=user.role,
+        action="create",
+        entity_type="sample",
+        entity_id=sample.id,
+        project_id=project.id,
+        after_data={"sample_code": sample.sample_code},
+    )
     db_session.add_all([result, material, txn, attachment, audit_log])
     db_session.commit()
 

@@ -120,6 +120,16 @@ def test_main_routers_are_registered():
     assert "/api/test-tasks" in route_paths
     assert "/api/test-results" in route_paths
     assert "/api/attachments" in route_paths
+    assert "/api/audit-logs" in route_paths
+    assert "/api/audit-logs/entity/{entity_type}/{entity_id}" in route_paths
+    assert "/api/admin/users" in route_paths
+    assert "/api/samples/{sample_id}/timeline" in route_paths
+    assert "/api/test-tasks/{task_id}/timeline" in route_paths
+    assert "/api/test-results/{result_id}/timeline" in route_paths
+    assert "/api/experiment-records/{record_id}/timeline" in route_paths
+    assert "/api/experiments/{experiment_id}/timeline" in route_paths
+    assert "/api/daily-reports/{report_id}/timeline" in route_paths
+    assert "/api/attachments/{attachment_id}/timeline" in route_paths
 
 
 def test_t1_6a_attachment_openapi_uses_unified_typed_contracts():

@@ -278,11 +278,12 @@ def test_project_manager_only_reviews_reports_for_managed_projects(client, creat
     assert manager_review.status_code == 404
 
 
-def test_daily_report_archive_is_not_part_of_t1_4_flow(client, create_user):
+def test_daily_report_archive_is_admin_only_for_t1_6b(client, create_user):
     _, project, _, record = setup_users_projects_and_record(client, create_user)
     report = client.post("/api/daily-reports", headers=auth_headers(client, "researcher"), json=report_payload(project["id"], record["id"])).json()["data"]
     client.post(f"/api/daily-reports/{report['id']}/submit", headers=auth_headers(client, "researcher"))
 
     response = client.post(f"/api/daily-reports/{report['id']}/archive", headers=auth_headers(client, "admin"))
 
-    assert response.status_code == 405
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "archived"

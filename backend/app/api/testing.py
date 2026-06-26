@@ -26,6 +26,7 @@ from app.schemas.testing import (
     TestTaskStatusChange,
 )
 from app.services import testing as testing_service
+from app.services import audit_logs as audit_service
 
 
 samples_router = APIRouter()
@@ -60,6 +61,11 @@ def create_sample(payload: SampleCreate, db: DbSession, current_user: CurrentUse
 @samples_router.get("/{sample_id}", response_model=ApiResponse[SampleRead])
 def read_sample(sample_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     return api_response(SampleRead.model_validate(testing_service.read_sample(db, current_user, sample_id)).model_dump())
+
+
+@samples_router.get("/{sample_id}/timeline")
+def read_sample_timeline(sample_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "sample", sample_id))
 
 
 @samples_router.patch("/{sample_id}", response_model=ApiResponse[SampleRead])
@@ -138,6 +144,11 @@ def read_task(task_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     return api_response(TestTaskRead.model_validate(testing_service.read_task(db, current_user, task_id)).model_dump())
 
 
+@tasks_router.get("/{task_id}/timeline")
+def read_task_timeline(task_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "test_task", task_id))
+
+
 @tasks_router.patch("/{task_id}/assignee", response_model=ApiResponse[TestTaskRead])
 def update_task_assignee(task_id: int, payload: TestTaskAssigneeUpdate, db: DbSession, current_user: CurrentUser) -> dict:
     return api_response(TestTaskRead.model_validate(testing_service.update_task_assignee(db, current_user, task_id, payload.assigned_to)).model_dump())
@@ -173,6 +184,11 @@ def create_result(payload: TestResultCreate, db: DbSession, current_user: Curren
 @results_router.get("/{result_id}", response_model=ApiResponse[TestResultRead])
 def read_result(result_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     return api_response(TestResultRead.model_validate(testing_service.read_result(db, current_user, result_id)).model_dump())
+
+
+@results_router.get("/{result_id}/timeline")
+def read_result_timeline(result_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "test_result", result_id))
 
 
 @results_router.patch("/{result_id}", response_model=ApiResponse[TestResultRead])

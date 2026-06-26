@@ -13,6 +13,7 @@ from app.schemas.attachment import (
 )
 from app.schemas.common import api_response
 from app.services import attachments as attachment_service
+from app.services import audit_logs as audit_service
 
 
 router = APIRouter()
@@ -45,6 +46,11 @@ def list_attachments(
 def read_attachment(attachment_id: int, db: DbSession, current_user: CurrentUser) -> dict:
     attachment = attachment_service.get_attachment(db, current_user, attachment_id)
     return api_response(AttachmentRead.model_validate(attachment))
+
+
+@router.get("/{attachment_id}/timeline")
+def read_attachment_timeline(attachment_id: int, db: DbSession, current_user: CurrentUser) -> dict:
+    return api_response(audit_service.list_entity_timeline(db, current_user, "attachment", attachment_id))
 
 
 @router.get("/{attachment_id}/download", response_class=Response)

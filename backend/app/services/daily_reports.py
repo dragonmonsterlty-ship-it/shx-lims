@@ -17,6 +17,7 @@ from app.schemas.daily_report import (
     DailyReportReturn,
     DailyReportUpdate,
 )
+from app.services.audit_logs import capture, record_audit
 from app.services.projects import is_project_member, user_brief
 
 
@@ -241,6 +242,16 @@ def create_report(db: Session, current_user: User, payload: DailyReportCreate) -
     report.items = [build_item(db, current_user, item) for item in payload.items]
     report.attachments = [build_attachment(attachment, current_user.id) for attachment in payload.attachments]
     db.add(report)
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="create",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        after_data={"id": report.id, "user_id": report.user_id, "status": report.status, "report_date": report.report_date},
+    )
     db.commit()
     return get_report_or_404(db, report.id)
 
@@ -249,6 +260,7 @@ def update_report(db: Session, current_user: User, report_id: int, payload: Dail
     report = get_report_or_404(db, report_id)
     ensure_can_view_report(db, current_user, report)
     ensure_can_modify_report(current_user, report)
+    before = capture(serialize_report_detail(report))
     updates = payload.model_dump(exclude_unset=True)
     items = updates.pop("items", None)
     attachments = updates.pop("attachments", None)
@@ -259,6 +271,17 @@ def update_report(db: Session, current_user: User, report_id: int, payload: Dail
     if attachments is not None:
         report.attachments = [build_attachment(attachment, current_user.id) for attachment in payload.attachments or []]
     report.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        before_data=before,
+        after_data=serialize_report_detail(report),
+    )
     db.commit()
     return get_report_or_404(db, report.id)
 
@@ -269,9 +292,21 @@ def submit_report(db: Session, current_user: User, report_id: int) -> DailyRepor
     ensure_can_submit_report(current_user, report)
     if report.status not in {"draft", "returned"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only draft or returned daily reports can be submitted")
+    before = capture({"status": report.status})
     report.status = "submitted"
     report.submitted_at = datetime.now(UTC)
     report.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="submit",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        before_data=before,
+        after_data={"status": report.status},
+    )
     db.commit()
     return get_report_or_404(db, report.id)
 
@@ -282,11 +317,23 @@ def review_report(db: Session, current_user: User, report_id: int, payload: Dail
     ensure_can_review_report(db, current_user, report)
     if report.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted daily reports can be reviewed")
+    before = capture({"status": report.status, "review_comment": report.review_comment})
     report.status = "confirmed"
     report.reviewer_id = current_user.id
     report.reviewed_at = datetime.now(UTC)
     report.review_comment = payload.review_comment
     report.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="approve",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        before_data=before,
+        after_data={"status": report.status, "review_comment": report.review_comment},
+    )
     db.commit()
     return get_report_or_404(db, report.id)
 
@@ -297,18 +344,48 @@ def return_report(db: Session, current_user: User, report_id: int, payload: Dail
     ensure_can_review_report(db, current_user, report)
     if report.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted daily reports can be returned")
+    before = capture({"status": report.status, "review_comment": report.review_comment})
     report.status = "returned"
     report.reviewer_id = current_user.id
     report.reviewed_at = datetime.now(UTC)
     report.review_comment = payload.review_comment
     report.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="reject",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        before_data=before,
+        after_data={"status": report.status, "review_comment": report.review_comment},
+    )
     db.commit()
     return get_report_or_404(db, report.id)
 
 
 def archive_report(db: Session, current_user: User, report_id: int) -> DailyReport:
-    _ = (db, current_user, report_id)
-    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Daily report archive is not part of T1.4 status flow")
+    report = get_report_or_404(db, report_id)
+    ensure_can_view_report(db, current_user, report)
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Daily report archive permission required")
+    before = capture({"status": report.status})
+    report.status = "archived"
+    report.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="archive",
+        entity_type="daily_report",
+        entity_id=report.id,
+        project_id=next(iter(report_project_ids(report)), None),
+        before_data=before,
+        after_data={"status": report.status},
+    )
+    db.commit()
+    return get_report_or_404(db, report.id)
 
 
 def experiment_record_brief(record: ExperimentRecord | None) -> dict | None:

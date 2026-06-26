@@ -482,17 +482,26 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
-    table_name: Mapped[str] = mapped_column(String(60), nullable=False)
-    record_id: Mapped[int] = mapped_column(BIGINT_ID, nullable=False)
-    action: Mapped[str] = mapped_column(String(10), nullable=False)
-    business_action: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    changed_by: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
-    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    changed_fields: Mapped[dict | None] = mapped_column(JSON_DATA, nullable=True)
-    old_value: Mapped[dict | None] = mapped_column(JSON_DATA, nullable=True)
-    new_value: Mapped[dict | None] = mapped_column(JSON_DATA, nullable=True)
-    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    actor_user_id: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
+    actor_role: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    entity_id: Mapped[int] = mapped_column(BIGINT_ID, nullable=False)
+    project_id: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("project.id"), nullable=True)
+    target_user_id: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("user.id"), nullable=True)
+    before_data: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON_DATA, nullable=True)
+    after_data: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON_DATA, nullable=True)
+    metadata_: Mapped[dict | list | str | int | float | bool | None] = mapped_column("metadata", JSON_DATA, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    actor = relationship("User", foreign_keys=[changed_by])
+    actor = relationship("User", foreign_keys=[actor_user_id])
+    target_user = relationship("User", foreign_keys=[target_user_id])
+    project = relationship("Project", foreign_keys=[project_id])
+
+    __table_args__ = (
+        Index("idx_audit_log_entity", "entity_type", "entity_id"),
+        Index("idx_audit_log_project", "project_id"),
+        Index("idx_audit_log_actor", "actor_user_id"),
+        Index("idx_audit_log_action", "action"),
+        Index("idx_audit_log_created_at", "created_at"),
+    )

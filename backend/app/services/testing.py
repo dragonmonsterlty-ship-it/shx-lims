@@ -26,6 +26,7 @@ from app.services.projects import (
     is_project_manager,
     is_project_member,
 )
+from app.services.audit_logs import capture, record_audit
 
 
 SAMPLE_STATUSES = {"registered", "in_testing", "pending_review", "completed", "cancelled"}
@@ -170,6 +171,16 @@ def create_sample(db: Session, current_user: User, payload: SampleCreate) -> dic
     )
     db.add(sample)
     try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="create",
+            entity_type="sample",
+            entity_id=sample.id,
+            project_id=sample.project_id,
+            after_data=sample_to_dict(sample),
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -181,12 +192,24 @@ def create_sample(db: Session, current_user: User, payload: SampleCreate) -> dic
 def update_sample(db: Session, current_user: User, sample_id: int, payload: SampleUpdate) -> dict:
     sample = get_sample(db, sample_id)
     ensure_can_manage_project(db, current_user, sample.project_id)
+    before = capture(sample_to_dict(sample))
     updates = payload.model_dump(exclude_unset=True)
     if "type" in updates:
         updates["sample_type"] = updates.pop("type")
     for field, value in updates.items():
         setattr(sample, field, value)
     sample.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="sample",
+        entity_id=sample.id,
+        project_id=sample.project_id,
+        before_data=before,
+        after_data=sample_to_dict(sample),
+    )
     db.commit()
     db.refresh(sample)
     return sample_to_dict(sample)
@@ -196,8 +219,21 @@ def change_sample_status(db: Session, current_user: User, sample_id: int, new_st
     sample = get_sample(db, sample_id)
     ensure_can_manage_project(db, current_user, sample.project_id)
     ensure_sample_status(new_status)
+    before = capture(sample_to_dict(sample))
     sample.status = new_status
     sample.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="sample",
+        entity_id=sample.id,
+        project_id=sample.project_id,
+        before_data=before,
+        after_data=sample_to_dict(sample),
+        metadata={"status_change": new_status},
+    )
     db.commit()
     db.refresh(sample)
     return sample_to_dict(sample)
@@ -421,6 +457,16 @@ def create_task(db: Session, current_user: User, payload: TestTaskCreate) -> dic
     sample.updated_by = current_user.id
     db.add(task)
     try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="create",
+            entity_type="test_task",
+            entity_id=task.id,
+            project_id=sample.project_id,
+            after_data=task_to_dict(task),
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -434,8 +480,21 @@ def update_task_assignee(db: Session, current_user: User, task_id: int, assigned
     if task.status in {"completed", "cancelled"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Closed task cannot be reassigned")
     ensure_active_project_assignee(db, task.sample.project_id, assigned_to)
+    before = capture(task_to_dict(task))
     task.assigned_to = assigned_to
     task.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="test_task",
+        entity_id=task.id,
+        project_id=task.sample.project_id,
+        before_data=before,
+        after_data=task_to_dict(task),
+        metadata={"task_event": "assign"},
+    )
     db.commit()
     return task_to_dict(get_task(db, task.id))
 
@@ -454,10 +513,23 @@ def change_task_status(db: Session, current_user: User, task_id: int, new_status
         allowed = {"pending": {"in_progress", "cancelled"}, "in_progress": {"cancelled"}}
     if new_status not in allowed.get(task.status, set()):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task status transition")
+    before = capture(task_to_dict(task))
     task.status = new_status
     task.updated_by = current_user.id
     if new_status == "cancelled":
         refresh_sample_status(db, task.sample, current_user.id)
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="test_task",
+        entity_id=task.id,
+        project_id=task.sample.project_id,
+        before_data=before,
+        after_data=task_to_dict(task),
+        metadata={"task_event": "start" if new_status == "in_progress" else "cancel"},
+    )
     db.commit()
     return task_to_dict(get_task(db, task.id))
 
@@ -576,6 +648,16 @@ def create_result(db: Session, current_user: User, payload: TestResultCreate) ->
     )
     ensure_assigned_result_editor(current_user, result)
     db.add(result)
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="create",
+        entity_type="test_result",
+        entity_id=result.id,
+        project_id=task.sample.project_id,
+        after_data=result_to_dict(result),
+    )
     db.commit()
     return result_to_dict(get_result(db, result.id))
 
@@ -585,6 +667,7 @@ def update_result(db: Session, current_user: User, result_id: int, payload: Test
     ensure_assigned_result_editor(current_user, result)
     if result.status not in {"draft", "rejected"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only draft or rejected results can be edited")
+    before = capture(result_to_dict(result))
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(result, field, value)
     if result.status == "rejected":
@@ -596,6 +679,17 @@ def update_result(db: Session, current_user: User, result_id: int, payload: Test
     result.entered_by = current_user.id
     result.entered_at = datetime.now(UTC)
     result.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="test_result",
+        entity_id=result.id,
+        project_id=result.sample_test.sample.project_id,
+        before_data=before,
+        after_data=result_to_dict(result),
+    )
     db.commit()
     return result_to_dict(get_result(db, result.id))
 
@@ -605,6 +699,7 @@ def submit_result(db: Session, current_user: User, result_id: int) -> dict:
     ensure_assigned_result_editor(current_user, result)
     if result.status != "draft":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only draft results can be submitted")
+    before = capture(result_to_dict(result))
     result.status = "submitted"
     result.review_status = "pending"
     result.submitted_by = current_user.id
@@ -612,6 +707,17 @@ def submit_result(db: Session, current_user: User, result_id: int) -> dict:
     result.updated_by = current_user.id
     result.sample_test.sample.status = "pending_review"
     result.sample_test.sample.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="submit",
+        entity_type="test_result",
+        entity_id=result.id,
+        project_id=result.sample_test.sample.project_id,
+        before_data=before,
+        after_data=result_to_dict(result),
+    )
     db.commit()
     return result_to_dict(get_result(db, result.id))
 
@@ -635,6 +741,8 @@ def approve_result(db: Session, current_user: User, result_id: int, comment: str
     ensure_reviewer(db, current_user, result)
     if result.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted results can be approved")
+    before_result = capture(result_to_dict(result))
+    before_task = capture(task_to_dict(result.sample_test))
     result.status = "approved"
     result.review_status = "approved"
     result.reviewed_by = current_user.id
@@ -644,6 +752,29 @@ def approve_result(db: Session, current_user: User, result_id: int, comment: str
     result.sample_test.status = "completed"
     result.sample_test.updated_by = current_user.id
     refresh_sample_status(db, result.sample_test.sample, current_user.id)
+    db.flush()
+    project_id = result.sample_test.sample.project_id
+    record_audit(
+        db,
+        current_user,
+        action="approve",
+        entity_type="test_result",
+        entity_id=result.id,
+        project_id=project_id,
+        before_data=before_result,
+        after_data=result_to_dict(result),
+    )
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="test_task",
+        entity_id=result.sample_test.id,
+        project_id=project_id,
+        before_data=before_task,
+        after_data=task_to_dict(result.sample_test),
+        metadata={"task_event": "complete"},
+    )
     db.commit()
     return result_to_dict(get_result(db, result.id))
 
@@ -653,6 +784,7 @@ def reject_result(db: Session, current_user: User, result_id: int, comment: str)
     ensure_reviewer(db, current_user, result)
     if result.status != "submitted":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only submitted results can be rejected")
+    before = capture(result_to_dict(result))
     result.status = "rejected"
     result.review_status = "rejected"
     result.reviewed_by = current_user.id
@@ -663,5 +795,16 @@ def reject_result(db: Session, current_user: User, result_id: int, comment: str)
     result.sample_test.updated_by = current_user.id
     result.sample_test.sample.status = "in_testing"
     result.sample_test.sample.updated_by = current_user.id
+    db.flush()
+    record_audit(
+        db,
+        current_user,
+        action="reject",
+        entity_type="test_result",
+        entity_id=result.id,
+        project_id=result.sample_test.sample.project_id,
+        before_data=before,
+        after_data=result_to_dict(result),
+    )
     db.commit()
     return result_to_dict(get_result(db, result.id))
