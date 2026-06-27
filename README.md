@@ -45,6 +45,8 @@ Copy-Item .env.example frontend\.env
 标准角色为 `admin` / `director` / `project_manager` / `operator`。
 中文名称分别为“系统管理员”/“主管”/“项目负责人”/“操作员”。演示账号使用规范用户名 `project_manager`；历史角色值 `pm` 仍可归一为 `project_manager`，但不再单独提供 `pm` 演示账号。
 
+需要重建干净、可重复的本地演示环境时，请使用受保护的 `.\scripts\seed-demo.ps1 -Force`。账号、数据摘要和按角色浏览器验收路径见 [`docs/demo-walkthrough.md`](docs/demo-walkthrough.md)。
+
 ## 手动命令（不走脚本时）
 
 后端(在 `backend/`,已激活 `.venv`):

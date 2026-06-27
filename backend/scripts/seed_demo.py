@@ -12,9 +12,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.business import (  # noqa: E402
     DailyReport,
-    DailyReportAttachment,
     DailyReportItem,
-    ExperimentAttachment,
     ExperimentRecord,
     ExperimentReagentUsage,
     InventoryTxn,
@@ -28,6 +26,12 @@ from app.models.business import (  # noqa: E402
     ExperimentRecordParticipant,
 )
 from app.models.user import User  # noqa: E402
+from app.schemas.daily_report import DailyReportCreate, DailyReportItemCreate, DailyReportReview  # noqa: E402
+from app.schemas.experiment_record import ExperimentRecordCreate  # noqa: E402
+from app.schemas.testing import SampleCreate, TestResultCreate, TestTaskCreate  # noqa: E402
+from app.services import daily_reports as daily_report_service  # noqa: E402
+from app.services import experiment_records as experiment_record_service  # noqa: E402
+from app.services import testing as testing_service  # noqa: E402
 
 
 DEFAULT_PASSWORD = "password123"
@@ -201,17 +205,6 @@ def experiment_record(
             created_by=creator.id,
         )
     )
-    created.attachments.append(
-        ExperimentAttachment(
-            file_name=f"{code}.pdf",
-            file_type="pdf",
-            file_size=1024,
-            storage_key=f"demo/experiments/{code}.pdf",
-            description="Demo attachment metadata only",
-            uploaded_by=creator.id,
-            created_by=creator.id,
-        )
-    )
     db.add(created)
     db.flush()
     return created
@@ -266,21 +259,10 @@ def daily_report(db, owner: User, project_id: int, record_id: int, summary: str)
             created_by=owner.id,
         )
     )
-    report.attachments.append(
-        DailyReportAttachment(
-            file_name="demo-chromatogram.pdf",
-            file_type="pdf",
-            file_size=2048,
-            storage_key="demo/daily-reports/chromatogram.pdf",
-            description="Demo daily report attachment metadata only",
-            uploaded_by=owner.id,
-            created_by=owner.id,
-        )
-    )
     db.add(report)
 
 
-def testing_workflow(db, project_item: Project, analyst: User, admin: User) -> None:
+def testing_workflow(db, project_item: Project, analyst: User, manager: User, admin: User) -> None:
     method = db.query(TestMethod).filter(TestMethod.code == "HPLC-DEMO-T15").one_or_none()
     if method is None:
         method = TestMethod(
@@ -297,51 +279,209 @@ def testing_workflow(db, project_item: Project, analyst: User, admin: User) -> N
         db.flush()
     else:
         method.is_active = True
+    db.commit()
 
-    sample = db.query(Sample).filter(Sample.sample_code == "DEMO-SAMPLE-T15").one_or_none()
-    if sample is None:
-        sample = Sample(
-            sample_code="DEMO-SAMPLE-T15",
-            project_id=project_item.id,
-            compound_name="Demo compound",
-            name="T1.5 demo assay sample",
-            sample_type="compound",
-            source="demo seed",
-            batch_no="DEMO-BATCH-T15",
-            amount=Decimal("10.0000"),
-            unit="mg",
-            storage_condition="2-8 C",
-            status="in_testing",
-            priority="normal",
-            created_by=admin.id,
+    pending_sample = db.query(Sample).filter(Sample.sample_code == "DEMO-SAMPLE-PENDING").one_or_none()
+    if pending_sample is None:
+        pending_data = testing_service.create_sample(
+            db,
+            manager,
+            SampleCreate(
+                project_id=project_item.id,
+                sample_no="DEMO-SAMPLE-PENDING",
+                name="待检测样品：稳定性留样",
+                type="compound",
+                source="MVP demo seed",
+                batch_no="DEMO-BATCH-PENDING",
+                amount=Decimal("10.0000"),
+                unit="mg",
+                storage_condition="2-8 C",
+                notes="用于演示待处理检测任务。",
+            ),
         )
-        db.add(sample)
-        db.flush()
-    else:
-        sample.is_deleted = False
-        sample.project_id = project_item.id
-
-    task = (
+        pending_sample = db.query(Sample).filter(Sample.id == pending_data["id"]).one()
+    pending_task = (
         db.query(SampleTest)
-        .filter(SampleTest.sample_id == sample.id, SampleTest.test_method_id == method.id)
+        .filter(SampleTest.sample_id == pending_sample.id, SampleTest.test_method_id == method.id)
         .one_or_none()
     )
-    if task is None:
-        task = SampleTest(
-            sample_id=sample.id,
-            test_method_id=method.id,
-            assigned_to=analyst.id,
-            status="pending",
-            priority="normal",
-            created_by=admin.id,
+    if pending_task is None:
+        testing_service.create_task(
+            db,
+            manager,
+            TestTaskCreate(
+                sample_id=pending_sample.id,
+                method_id=method.id,
+                assigned_to=analyst.id,
+                priority="normal",
+            ),
         )
-        db.add(task)
-    else:
-        task.assigned_to = analyst.id
-        if task.result is None:
-            task.status = "pending"
-    if task.result is not None and task.result.status not in {"approved", "rejected", "submitted", "draft"}:
-        task.result.status = "draft"
+
+    completed_sample = db.query(Sample).filter(Sample.sample_code == "DEMO-SAMPLE-COMPLETE").one_or_none()
+    if completed_sample is not None:
+        return
+    completed_data = testing_service.create_sample(
+        db,
+        manager,
+        SampleCreate(
+            project_id=project_item.id,
+            sample_no="DEMO-SAMPLE-COMPLETE",
+            name="已完成样品：MVP 含量测定",
+            type="compound",
+            source="MVP demo seed",
+            batch_no="DEMO-BATCH-COMPLETE",
+            amount=Decimal("12.0000"),
+            unit="mg",
+            storage_condition="室温避光",
+            notes="用于演示完整检测与审核闭环。",
+        ),
+    )
+    task_data = testing_service.create_task(
+        db,
+        manager,
+        TestTaskCreate(
+            sample_id=completed_data["id"],
+            method_id=method.id,
+            assigned_to=analyst.id,
+            priority="high",
+        ),
+    )
+    testing_service.change_task_status(db, analyst, task_data["id"], "in_progress")
+    result_data = testing_service.create_result(
+        db,
+        analyst,
+        TestResultCreate(
+            task_id=task_data["id"],
+            result_data={"assay": 99.6, "unit": "%", "judgment": "pass"},
+            conclusion="含量符合演示规格。",
+        ),
+    )
+    testing_service.submit_result(db, analyst, result_data["id"])
+    testing_service.approve_result(db, manager, result_data["id"], "演示审核通过")
+
+
+def browser_workflow(
+    db,
+    first_project: Project,
+    operator: User,
+    analyst: User,
+    manager: User,
+    admin: User,
+) -> None:
+    draft_record = db.query(ExperimentRecord).filter(ExperimentRecord.code == "EXP-DEMO-A-DRAFT").one_or_none()
+    if draft_record is None:
+        draft_record = experiment_record_service.create_record(
+            db,
+            operator,
+            ExperimentRecordCreate(
+                project_id=first_project.id,
+                code="EXP-DEMO-A-DRAFT",
+                title="MVP Demo 草稿实验：样品前处理",
+                record_type="analysis",
+                owner_id=operator.id,
+                participant_ids=[operator.id, analyst.id],
+                experiment_date=date(2026, 6, 28),
+                objective="建立可重复的样品前处理流程。",
+                procedure="称量、溶解、定容并过滤。",
+                result_summary="前处理已完成，等待仪器检测。",
+                conclusion="流程可用于后续检测。",
+                next_step="由 analyst 执行 HPLC 检测。",
+                risk_note="演示数据，不用于正式报告。",
+            ),
+        )
+
+    submitted = db.query(ExperimentRecord).filter(ExperimentRecord.code == "EXP-DEMO-A-SUBMITTED").one_or_none()
+    if submitted is None:
+        submitted = experiment_record_service.create_record(
+            db,
+            operator,
+            ExperimentRecordCreate(
+                project_id=first_project.id,
+                code="EXP-DEMO-A-SUBMITTED",
+                title="MVP Demo 已提交实验：方法确认",
+                record_type="analysis",
+                owner_id=operator.id,
+                participant_ids=[operator.id],
+                experiment_date=date(2026, 6, 27),
+                objective="确认演示检测方法可执行。",
+                procedure="按方法条件完成系统适用性与样品检测。",
+                result_summary="系统适用性符合预期。",
+                conclusion="方法满足本轮演示需要。",
+                next_step="项目负责人复核结果。",
+                risk_note="无阻塞风险。",
+            ),
+        )
+        experiment_record_service.submit_record(db, operator, submitted.id)
+
+    draft_report = (
+        db.query(DailyReport)
+        .filter(DailyReport.user_id == operator.id, DailyReport.summary == "MVP Demo 多事项日报")
+        .one_or_none()
+    )
+    if draft_report is None:
+        daily_report_service.create_report(
+            db,
+            operator,
+            DailyReportCreate(
+                report_date=date(2026, 6, 28),
+                summary="MVP Demo 多事项日报",
+                issues="暂无阻塞问题。",
+                next_plan="完成检测并提交项目负责人审核。",
+                items=[
+                    DailyReportItemCreate(
+                        project_id=first_project.id,
+                        experiment_record_id=draft_record.id,
+                        work_type="experiment",
+                        content="完成样品前处理实验记录。",
+                        progress_note="实验步骤已记录。",
+                        hours_spent=Decimal("2.00"),
+                        next_step="交接 analyst 检测。",
+                    ),
+                    DailyReportItemCreate(
+                        project_id=first_project.id,
+                        work_type="documentation",
+                        content="整理方法与交接说明。",
+                        progress_note="文档已更新。",
+                        hours_spent=Decimal("1.00"),
+                        next_step="等待项目负责人复核。",
+                        sort_order=2,
+                    ),
+                ],
+            ),
+        )
+
+    confirmed_report = (
+        db.query(DailyReport)
+        .filter(DailyReport.user_id == operator.id, DailyReport.summary == "MVP Demo 已确认日报")
+        .one_or_none()
+    )
+    if confirmed_report is None:
+        confirmed_report = daily_report_service.create_report(
+            db,
+            operator,
+            DailyReportCreate(
+                report_date=date(2026, 6, 27),
+                summary="MVP Demo 已确认日报",
+                next_plan="进入下一轮样品检测。",
+                items=[
+                    DailyReportItemCreate(
+                        project_id=first_project.id,
+                        experiment_record_id=submitted.id,
+                        work_type="analysis",
+                        content="完成方法确认实验并提交。",
+                    )
+                ],
+            ),
+        )
+        daily_report_service.submit_report(db, operator, confirmed_report.id)
+        daily_report_service.review_report(
+            db,
+            manager,
+            confirmed_report.id,
+            DailyReportReview(review_comment="演示日报确认通过"),
+        )
+
+    testing_workflow(db, first_project, analyst, manager, admin)
 
 
 def seed_database(db) -> None:
@@ -353,8 +493,8 @@ def seed_database(db) -> None:
     operator = user(db, "operator", "Demo Operator", "operator", "Lab")
     analyst = user(db, "analyst", "Demo Analyst", "operator", "Analytical")
 
-    first_project = project(db, "DEMO-001", "Demo Assay Project", manager, admin.id)
-    second_project = project(db, "DEMO-002", "Demo Formulation Project", manager, admin.id)
+    first_project = project(db, "DEMO-001", "MVP Demo Project A", manager, admin.id)
+    second_project = project(db, "DEMO-002", "MVP Demo Project B", manager, admin.id)
     db.flush()
 
     member(db, first_project.id, manager.id, "manager", admin.id)
@@ -362,8 +502,6 @@ def seed_database(db) -> None:
     member(db, first_project.id, operator.id, "member", admin.id)
     member(db, first_project.id, analyst.id, "member", admin.id)
     member(db, second_project.id, manager.id, "manager", admin.id)
-    member(db, second_project.id, researcher.id, "member", admin.id)
-    member(db, second_project.id, operator.id, "member", admin.id)
 
     methanol = reagent(db, "Methanol", "67-56-1", "mL", Decimal("10.0000"), admin.id)
     acetonitrile = reagent(db, "Acetonitrile", "75-05-8", "mL", Decimal("10.0000"), admin.id)
@@ -375,12 +513,12 @@ def seed_database(db) -> None:
     inventory_txn(db, lot_b.id, Decimal("20.0000"), Decimal("20.0000"), operator.id)
 
     first_record = experiment_record(db, "EXP-DEMO-001", first_project.id, researcher, operator, lot_a, [operator.id])
-    second_record = experiment_record(db, "EXP-DEMO-002", second_project.id, researcher, analyst, lot_b, [operator.id])
+    second_record = experiment_record(db, "EXP-DEMO-002", second_project.id, manager, manager, lot_b, [manager.id])
     db.flush()
     daily_report(db, researcher, first_project.id, first_record.id, "Demo daily report for assay project")
-    daily_report(db, operator, second_project.id, second_record.id, "Demo daily report for formulation project")
-    testing_workflow(db, first_project, analyst, admin)
+    daily_report(db, manager, second_project.id, second_record.id, "Demo daily report for formulation project")
     db.commit()
+    browser_workflow(db, first_project, operator, analyst, manager, admin)
 
 
 def main() -> None:
