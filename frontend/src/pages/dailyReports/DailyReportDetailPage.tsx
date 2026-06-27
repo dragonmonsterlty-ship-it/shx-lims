@@ -1,11 +1,12 @@
 import { PageContainer } from '@ant-design/pro-components'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Descriptions, Empty, Space, Table, Tabs, Timeline, Typography } from 'antd'
+import { Button, Descriptions, Empty, Space, Table, Tabs, Typography } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../auth/useAuth'
 import { canDeleteAttachment, canEditReport, canUploadAttachment } from '../../auth/permissions'
 import { AttachmentPanel } from '../../components/attachments'
+import { AuditTimeline } from '../../components/audit'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
 import { usageRoleLabel } from '../../components/status'
@@ -51,15 +52,8 @@ export default function DailyReportDetailPage() {
     queryFn: () => experimentService.listMaterialUsages(report!.related_experiment_id!),
     enabled: !!report?.related_experiment_id,
   })
-  const activitiesQuery = useQuery({
-    queryKey: ['report', reportId, 'activities'],
-    queryFn: () => dailyReportService.listReportActivities(reportId),
-    enabled: Number.isFinite(reportId),
-  })
-
   const refetchAll = () => {
     reportQuery.refetch()
-    activitiesQuery.refetch()
   }
 
   const usageColumns = [
@@ -231,22 +225,9 @@ export default function DailyReportDetailPage() {
               },
               {
                 key: 'activity',
-                label: '操作记录',
-                children: activitiesQuery.data?.length ? (
-                  <Timeline
-                    items={activitiesQuery.data.map((a) => ({
-                      children: (
-                        <Space>
-                          <Text>{a.action}</Text>
-                          <Text type="secondary">
-                            {getName(a.actor_id)} · {formatDateTime(a.at)}
-                          </Text>
-                        </Space>
-                      ),
-                    }))}
-                  />
-                ) : (
-                  <Empty description="暂无操作记录" />
+                label: '审计时间线',
+                children: (
+                  <AuditTimeline entityType="daily_report" entityId={report.id} title={null} compact />
                 ),
               },
             ]}

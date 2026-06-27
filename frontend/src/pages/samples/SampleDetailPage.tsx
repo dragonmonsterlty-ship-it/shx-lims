@@ -19,6 +19,7 @@ import {
   canUploadAttachment,
 } from '../../auth/permissions'
 import { AttachmentPanel } from '../../components/attachments'
+import { AuditTimeline } from '../../components/audit'
 import { useAuth } from '../../auth/useAuth'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
@@ -395,15 +396,29 @@ export default function SampleDetailPage() {
                                     canDeleteAttachment(user, attachment, taskContext, scope)
                                   }
                                 />
+                                <AuditTimeline
+                                  entityType="test_task"
+                                  entityId={task.id}
+                                  title="检测任务审计时间线"
+                                  compact
+                                />
                                 {task.result_id ? (
-                                  <AttachmentPanel
-                                    entityType="test_result"
-                                    entityId={task.result_id}
-                                    canUpload={canUploadAttachment(user, resultContext, scope)}
-                                    canDelete={(attachment) =>
-                                      canDeleteAttachment(user, attachment, resultContext, scope)
-                                    }
-                                  />
+                                  <>
+                                    <AttachmentPanel
+                                      entityType="test_result"
+                                      entityId={task.result_id}
+                                      canUpload={canUploadAttachment(user, resultContext, scope)}
+                                      canDelete={(attachment) =>
+                                        canDeleteAttachment(user, attachment, resultContext, scope)
+                                      }
+                                    />
+                                    <AuditTimeline
+                                      entityType="test_result"
+                                      entityId={task.result_id}
+                                      title="检测结果审计时间线"
+                                      compact
+                                    />
+                                  </>
                                 ) : null}
                               </Space>
                             )
@@ -433,6 +448,13 @@ export default function SampleDetailPage() {
                     key: 'info',
                     label: '备注',
                     children: sample.notes ?? '—',
+                  },
+                  {
+                    key: 'audit',
+                    label: '审计时间线',
+                    children: (
+                      <AuditTimeline entityType="sample" entityId={sample.id} title={null} compact />
+                    ),
                   },
                 ]}
               />

@@ -4,12 +4,10 @@ import {
   App,
   Button,
   Descriptions,
-  Empty,
   Popconfirm,
   Space,
   Table,
   Tabs,
-  Timeline,
   Typography,
 } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -23,6 +21,7 @@ import {
   canUploadAttachment,
 } from '../../auth/permissions'
 import { AttachmentPanel } from '../../components/attachments'
+import { AuditTimeline } from '../../components/audit'
 import QueryBoundary from '../../components/QueryBoundary'
 import StatusTag from '../../components/StatusTag'
 import { usageRoleLabel } from '../../components/status'
@@ -57,11 +56,6 @@ export default function ExperimentDetailPage() {
     queryFn: () => projectService.getProject(exp!.project_id),
     enabled: !!exp,
   })
-  const activitiesQuery = useQuery({
-    queryKey: ['experiment', experimentId, 'activities'],
-    queryFn: () => experimentService.listExperimentActivities(experimentId),
-    enabled: Number.isFinite(experimentId),
-  })
   const usagesQuery = useQuery({
     queryKey: ['experiment', experimentId, 'usages'],
     queryFn: () => experimentService.listMaterialUsages(experimentId),
@@ -78,7 +72,6 @@ export default function ExperimentDetailPage() {
       await experimentService.dispenseMaterials(exp.id, user.id)
       message.success('已确认出库，库存已按实际用量扣减')
       usagesQuery.refetch()
-      activitiesQuery.refetch()
     } catch (error) {
       message.error((error as ApiError).message || '出库失败')
     }
@@ -138,7 +131,6 @@ export default function ExperimentDetailPage() {
                 trigger={<Button type="primary">编辑</Button>}
                 onSaved={() => {
                   expQuery.refetch()
-                  activitiesQuery.refetch()
                 }}
               />,
             ]
@@ -272,22 +264,9 @@ export default function ExperimentDetailPage() {
               },
               {
                 key: 'activity',
-                label: '操作日志',
-                children: activitiesQuery.data?.length ? (
-                  <Timeline
-                    items={activitiesQuery.data.map((a) => ({
-                      children: (
-                        <Space>
-                          <Text>{a.action}</Text>
-                          <Text type="secondary">
-                            {getName(a.actor_id)} · {formatDateTime(a.at)}
-                          </Text>
-                        </Space>
-                      ),
-                    }))}
-                  />
-                ) : (
-                  <Empty description="暂无操作日志" />
+                label: '审计时间线',
+                children: (
+                  <AuditTimeline entityType="experiment" entityId={exp.id} title={null} compact />
                 ),
               },
             ]}
