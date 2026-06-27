@@ -131,16 +131,57 @@ try {
   $env:VITE_API_BASE_URL = $base
   npm run verify:api
 } finally { Pop-Location }
-Write-Host '== T1.6A attachment smoke =='
+Write-Host '== T1.9.2 admin and audit RC smoke =='
 $managerToken = (Invoke-Api POST '/auth/login' $null @{ username = 'project_manager'; password = 'password123' }).data.access_token
-$directorToken = (Invoke-Api POST '/auth/login' $null @{ username = 'director'; password = 'password123' }).data.access_token
 $analystToken = (Invoke-Api POST '/auth/login' $null @{ username = 'analyst'; password = 'password123' }).data.access_token
+$adminUsers = Invoke-Api GET '/admin/users' $tok $null
+if ($adminUsers.data -isnot [System.Array] -or $adminUsers.data.Count -lt 1) {
+  throw 'RC admin user list is not a non-empty array.'
+}
+Write-Host '  OK admin user list'
+Invoke-ApiExpectStatus GET '/admin/users' $analystToken $null 403
+Write-Host '  OK non-admin user list rejected'
+$adminAudit = Invoke-Api GET '/audit-logs?page=1&page_size=10' $tok $null
+if ($null -eq $adminAudit.data.items -or $adminAudit.data.page_size -ne 10) {
+  throw 'RC admin audit list pagination contract failed.'
+}
+$managerAudit = Invoke-Api GET '/audit-logs?page=1&page_size=100' $managerToken $null
+if ($null -eq $managerAudit.data.items) { throw 'RC project manager audit list contract failed.' }
+Invoke-ApiExpectStatus GET '/audit-logs?page=1&page_size=10' $analystToken $null 403
+Write-Host '  OK ordinary member audit list rejected'
+$rcExperiments = Invoke-Api GET '/experiment-records?page=1&page_size=1' $tok $null
+$rcReports = Invoke-Api GET '/daily-reports?page=1&page_size=1' $tok $null
+$rcSamples = Invoke-Api GET '/samples?page=1&page_size=1' $tok $null
+foreach ($entity in @(
+  @{ Type = 'experiment'; Id = $rcExperiments.data.items[0].id },
+  @{ Type = 'daily_report'; Id = $rcReports.data.items[0].id },
+  @{ Type = 'sample'; Id = $rcSamples.data.items[0].id }
+)) {
+  if (-not $entity.Id) { throw "RC $($entity.Type) timeline requires a real entity id." }
+  $timeline = Invoke-Api GET "/audit-logs/entity/$($entity.Type)/$($entity.Id)" $tok $null
+  if ($timeline.data -isnot [System.Array]) {
+    throw "RC $($entity.Type) timeline is not an array."
+  }
+}
+Write-Host '  OK experiment, daily_report, and sample entity timelines'
+Write-Host '  OK cross-project entity timelines rejected by real API verifier'
+Write-Host '== T1.6A attachment smoke =='
+$directorToken = (Invoke-Api POST '/auth/login' $null @{ username = 'director'; password = 'password123' }).data.access_token
 if (-not $managerToken -or -not $directorToken -or -not $analystToken) { throw 'T1.6A smoke login failed.' }
 
-$samples = Invoke-Api GET '/samples?page=1&page_size=20' $managerToken
-$sample = $samples.data.items | Select-Object -First 1
-if (-not $sample) { throw 'T1.6A smoke requires at least one manager-visible sample.' }
-$sampleId = $sample.id
+$projects = Invoke-Api GET '/projects?page=1&page_size=100' $managerToken
+$attachmentProject = $projects.data.items | Select-Object -First 1
+if (-not $attachmentProject) { throw 'T1.6A smoke requires a manager-visible project.' }
+$stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$sample = Invoke-Api POST '/samples' $managerToken @{
+  project_id = $attachmentProject.id
+  sample_no = "T16A-$stamp"
+  name = 'T1.6A attachment smoke sample'
+  type = 'compound'
+  status = 'registered'
+  priority = 'normal'
+}
+$sampleId = $sample.data.id
 $content = 'T1.6A smoke attachment'
 $upload = Invoke-AttachmentUpload $managerToken 'sample' $sampleId 't1-6a-smoke.txt' $content 'text/plain'
 $attachmentId = $upload.data.id
@@ -162,11 +203,10 @@ Write-Host '  OK download returns original bytes'
 Invoke-AttachmentUploadExpectStatus $directorToken 'sample' $sampleId 'director-denied.txt' 'director denied' 'text/plain' 403
 Write-Host '  OK director upload rejected'
 
-$projects = Invoke-Api GET '/projects?page=1&page_size=100' $managerToken
-$otherProject = $projects.data.items | Where-Object { $_.project_code -eq 'DEMO-002' } | Select-Object -First 1
-if (-not $otherProject) { throw 'T1.6A smoke requires DEMO-002 project from seed data.' }
-$stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-$crossSample = Invoke-Api POST '/samples' $managerToken @{
+$adminProjects = Invoke-Api GET '/projects?page=1&page_size=100' $tok $null
+$otherProject = $adminProjects.data.items | Where-Object { $_.code -like 'RC-X-*' } | Select-Object -First 1
+if (-not $otherProject) { throw 'T1.6A smoke requires the isolated RC audit project.' }
+$crossSample = Invoke-Api POST '/samples' $tok @{
   project_id = $otherProject.id
   sample_no = "T16A-X-$stamp"
   name = 'T1.6A cross project sample'
@@ -174,7 +214,7 @@ $crossSample = Invoke-Api POST '/samples' $managerToken @{
   status = 'registered'
   priority = 'normal'
 }
-$crossUpload = Invoke-AttachmentUpload $managerToken 'sample' $crossSample.data.id 't1-6a-cross.txt' 'cross project' 'text/plain'
+$crossUpload = Invoke-AttachmentUpload $tok 'sample' $crossSample.data.id 't1-6a-cross.txt' 'cross project' 'text/plain'
 $crossAttachmentId = $crossUpload.data.id
 Invoke-ApiExpectStatus GET "/attachments/$crossAttachmentId" $analystToken $null 404
 Invoke-DownloadExpectStatus "/attachments/$crossAttachmentId/download" $analystToken 404

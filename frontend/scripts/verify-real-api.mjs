@@ -57,6 +57,27 @@ function assertPage(name, value) {
   }
 }
 
+function assertTimeline(name, value, entityType, entityId) {
+  if (!Array.isArray(value)) {
+    throw new Error(`${name} timeline is not an array`)
+  }
+  for (const item of value) {
+    if (item.entity_type !== entityType || item.entity_id !== entityId) {
+      throw new Error(`${name} timeline contains another entity`)
+    }
+  }
+}
+
+function assertManagerAuditScope(value, projectIds, forbiddenEntityIds) {
+  assertPage('project_manager audit logs', value)
+  if (value.items.some((item) => !projectIds.has(item.project_id))) {
+    throw new Error('project_manager audit logs escaped the managed project scope')
+  }
+  if (value.items.some((item) => forbiddenEntityIds.has(item.entity_id))) {
+    throw new Error('project_manager audit logs exposed a cross-project entity')
+  }
+}
+
 const health = await api('/health')
 if (health.status !== 'ok') throw new Error('health status is not ok')
 
@@ -127,6 +148,18 @@ if (!analyst) throw new Error('managed project has no analyst member')
 
 const lot = lots.items[0]
 const suffix = `${Date.now()}`
+const isolatedProject = await api('/projects', {
+  token,
+  method: 'POST',
+  body: {
+    project_code: `RC-X-${suffix}`,
+    name: 'RC isolated audit project',
+    project_type: 'assay',
+    lead_user_id: login.user.id,
+    status: 'active',
+    priority: 'normal',
+  },
+})
 const createdExperiment = await api('/experiment-records', {
   token: operatorLogin.access_token,
   method: 'POST',
@@ -345,6 +378,88 @@ if (completedTask.status !== 'completed' || completedSample.status !== 'complete
   throw new Error('T1.5 task/sample did not complete after approval')
 }
 
+const adminUsers = await api('/admin/users', { token })
+if (!Array.isArray(adminUsers) || !adminUsers.length) {
+  throw new Error('admin user list is not a non-empty array')
+}
+await expectHttp('/admin/users', 403, { token: operatorLogin.access_token })
+await expectHttp('/audit-logs?page=1&page_size=10', 403, {
+  token: operatorLogin.access_token,
+})
+
+const crossExperiment = await api('/experiment-records', {
+  token,
+  method: 'POST',
+  body: {
+    project_id: isolatedProject.id,
+    code: `EXP-RC-X-${suffix}`,
+    title: 'RC cross-project audit experiment',
+    record_type: 'analysis',
+    status: 'draft',
+  },
+})
+const crossReport = await api('/daily-reports', {
+  token,
+  method: 'POST',
+  body: {
+    report_date: new Date().toISOString().slice(0, 10),
+    items: [
+      {
+        project_id: isolatedProject.id,
+        work_type: 'analysis',
+        content: 'RC cross-project audit report',
+        sort_order: 0,
+      },
+    ],
+  },
+})
+const crossSample = await api('/samples', {
+  token,
+  method: 'POST',
+  body: {
+    project_id: isolatedProject.id,
+    sample_no: `S-RC-X-${suffix}`,
+    name: 'RC cross-project audit sample',
+    type: 'compound',
+  },
+})
+
+for (const [entityType, entityId, memberToken] of [
+  ['experiment', createdExperiment.id, operatorLogin.access_token],
+  ['daily_report', report.id, operatorLogin.access_token],
+  ['sample', sample.id, managerLogin.access_token],
+]) {
+  const path = `/audit-logs/entity/${entityType}/${entityId}`
+  const adminTimeline = await api(path, { token })
+  const memberTimeline = await api(path, { token: memberToken })
+  assertTimeline(`${entityType} admin`, adminTimeline, entityType, entityId)
+  assertTimeline(`${entityType} member`, memberTimeline, entityType, entityId)
+  if (!adminTimeline.some((item) => item.action === 'create')) {
+    throw new Error(`${entityType} timeline is missing its create audit event`)
+  }
+}
+
+await expectHttp(`/audit-logs/entity/experiment/${crossExperiment.id}`, 404, {
+  token: managerLogin.access_token,
+})
+await expectHttp(`/audit-logs/entity/daily_report/${crossReport.id}`, 404, {
+  token: managerLogin.access_token,
+})
+await expectHttp(`/audit-logs/entity/sample/${crossSample.id}`, 404, {
+  token: managerLogin.access_token,
+})
+
+const adminAuditLogs = await api('/audit-logs?page=1&page_size=10', { token })
+assertPage('admin audit logs', adminAuditLogs)
+const managerAuditLogs = await api('/audit-logs?page=1&page_size=100', {
+  token: managerLogin.access_token,
+})
+assertManagerAuditScope(
+  managerAuditLogs,
+  new Set(managerProjects.items.map((item) => item.id)),
+  new Set([crossExperiment.id, crossReport.id, crossSample.id]),
+)
+
 console.log(
   JSON.stringify(
     {
@@ -364,6 +479,10 @@ console.log(
       t1_5_task: task.id,
       t1_5_result: approvedResult.id,
       t1_5_status: approvedResult.status,
+      admin_users: adminUsers.length,
+      admin_audit_logs: adminAuditLogs.total,
+      manager_audit_logs: managerAuditLogs.total,
+      entity_timelines: ['experiment', 'daily_report', 'sample'],
     },
     null,
     2,
