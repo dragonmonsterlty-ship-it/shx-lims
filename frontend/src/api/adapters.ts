@@ -22,10 +22,10 @@ import type {
 } from '../types'
 
 /**
- * 后端角色词表 → 前端四级角色枚举归一。
+ * 后端角色词表 → 前端六级角色枚举归一。
  * 后端可能返回 pm / principal_investigator / researcher 等别名；前端 RBAC
- * （菜单、permissions、roleLabel、负责人候选）只认 admin/director/project_manager/operator。
- * 未知角色按最小权限归为 operator，避免越权。
+ * （菜单、permissions、roleLabel、负责人候选）只认后端六种正式角色。
+ * 未知角色按最小权限归为 viewer，避免越权；保留既有历史别名。
  */
 const ROLE_ALIASES: Record<string, Role> = {
   admin: 'admin',
@@ -35,14 +35,15 @@ const ROLE_ALIASES: Record<string, Role> = {
   principal_investigator: 'project_manager',
   pi: 'project_manager',
   operator: 'operator',
-  researcher: 'operator',
-  analyst: 'operator',
-  qa: 'operator',
+  researcher: 'researcher',
+  analyst: 'researcher',
+  viewer: 'viewer',
+  qa: 'viewer',
 }
 
 export function normalizeRole(raw: string | null | undefined): Role {
-  if (!raw) return 'operator'
-  return ROLE_ALIASES[raw.toLowerCase()] ?? 'operator'
+  if (!raw) return 'viewer'
+  return ROLE_ALIASES[raw.toLowerCase()] ?? 'viewer'
 }
 
 export interface BackendUserBrief {

@@ -44,4 +44,33 @@ describe('normalizeApiError', () => {
       }),
     )
   })
+
+  it('keeps the unified 403 error envelope without inventing field errors', () => {
+    const error = new AxiosError(
+      'Request failed',
+      'ERR_BAD_REQUEST',
+      undefined,
+      undefined,
+      {
+        status: 403,
+        statusText: 'Forbidden',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: {
+          code: 403,
+          message: 'Administrator permission required',
+          data: null,
+        },
+      },
+    )
+
+    expect(normalizeApiError(error)).toEqual(
+      expect.objectContaining({
+        code: 403,
+        status: 403,
+        message: 'Administrator permission required',
+        fieldErrors: undefined,
+      }),
+    )
+  })
 })

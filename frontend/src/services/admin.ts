@@ -1,0 +1,44 @@
+import { endpoints } from '../api/endpoints'
+import { request } from '../api/http'
+import type { AdminUser, PasswordResetResult, UserRole } from '../types'
+
+export function listAdminUsers(): Promise<AdminUser[]> {
+  return request<AdminUser[]>({
+    method: 'GET',
+    url: endpoints.adminUsers.root,
+  })
+}
+
+export function updateUserStatus(userId: number, isActive: boolean): Promise<AdminUser> {
+  return request<AdminUser>({
+    method: 'PATCH',
+    url: endpoints.adminUsers.status(userId),
+    data: { is_active: isActive },
+  })
+}
+
+export function updateUserRole(userId: number, role: UserRole): Promise<AdminUser> {
+  return request<AdminUser>({
+    method: 'PATCH',
+    url: endpoints.adminUsers.role(userId),
+    data: { role },
+  })
+}
+
+export function resetUserPassword(
+  userId: number,
+  newPassword: string,
+): Promise<PasswordResetResult> {
+  return request<PasswordResetResult>({
+    method: 'POST',
+    url: endpoints.adminUsers.resetPassword(userId),
+    data: { new_password: newPassword },
+  })
+}
+
+export const adminService = {
+  listAdminUsers,
+  updateUserStatus,
+  updateUserRole,
+  resetUserPassword,
+}

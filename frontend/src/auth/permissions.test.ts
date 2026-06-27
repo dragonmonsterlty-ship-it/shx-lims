@@ -4,16 +4,43 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
+  canManageUsers,
   canDeleteAttachment,
+  canCreateReport,
   canExecuteTestTask,
   canManageSample,
   canReviewTestResult,
+  canUseAdminRoute,
   canUploadAttachment,
+  canViewAuditLogs,
+  canViewUserAuditTimeline,
+  can,
   roleLabel,
 } from './permissions'
 import { normalizeRole } from '../api/adapters'
 
 describe('role terminology', () => {
+  it('parses all six backend roles and safely falls back to viewer', () => {
+    expect(
+      ['admin', 'director', 'project_manager', 'researcher', 'operator', 'viewer'].map(
+        normalizeRole,
+      ),
+    ).toEqual(['admin', 'director', 'project_manager', 'researcher', 'operator', 'viewer'])
+    expect(normalizeRole('unknown-role')).toBe('viewer')
+    expect(normalizeRole(undefined)).toBe('viewer')
+  })
+
+  it('provides labels for all six backend roles', () => {
+    expect(roleLabel).toEqual({
+      admin: '系统管理员',
+      director: '主管',
+      project_manager: '项目负责人',
+      researcher: '研究员',
+      operator: '操作员',
+      viewer: '只读用户',
+    })
+  })
+
   it('labels director as 主管 and keeps it as the director role', () => {
     expect(roleLabel.director).toBe('主管')
     expect(normalizeRole('director')).toBe('director')
@@ -80,5 +107,39 @@ describe('role terminology', () => {
     expect(canDeleteAttachment(operator, attachment, editableContext, scope)).toBe(true)
     expect(canDeleteAttachment(operator, managerAttachment, editableContext, scope)).toBe(false)
     expect(canDeleteAttachment(director, attachment, editableContext, scope)).toBe(false)
+  })
+
+  it('enforces T1.6B admin and audit capabilities', () => {
+    expect(canManageUsers('admin')).toBe(true)
+    expect(canUseAdminRoute('admin')).toBe(true)
+    expect(canViewAuditLogs('admin')).toBe(true)
+    expect(canViewAuditLogs('project_manager')).toBe(true)
+
+    for (const role of ['director', 'researcher', 'operator', 'viewer'] as const) {
+      expect(canManageUsers(role)).toBe(false)
+      expect(canUseAdminRoute(role)).toBe(false)
+      expect(canViewAuditLogs(role)).toBe(false)
+    }
+
+    expect(canManageUsers('project_manager')).toBe(false)
+    expect(canUseAdminRoute('project_manager')).toBe(false)
+    expect(canViewUserAuditTimeline({ id: 1, role: 'admin' }, 99)).toBe(true)
+    expect(canViewUserAuditTimeline({ id: 7, role: 'viewer' }, 7)).toBe(true)
+    expect(canViewUserAuditTimeline({ id: 7, role: 'viewer' }, 8)).toBe(false)
+  })
+
+  it('keeps the viewer fallback read-only', () => {
+    const scope = { managed: new Set([10]), member: new Set([10]) }
+
+    expect(can.writeData('viewer')).toBe(false)
+    expect(can.review('viewer')).toBe(false)
+    expect(canCreateReport('viewer')).toBe(false)
+    expect(
+      canUploadAttachment(
+        { id: 7, role: 'viewer' },
+        { entityType: 'sample', projectId: 10, editable: true, ownerId: 7 },
+        scope,
+      ),
+    ).toBe(false)
   })
 })

@@ -1,6 +1,15 @@
 import type { Id } from './common'
 
-export type Role = 'admin' | 'director' | 'project_manager' | 'operator'
+export type UserRole =
+  | 'admin'
+  | 'director'
+  | 'project_manager'
+  | 'researcher'
+  | 'operator'
+  | 'viewer'
+
+/** Backward-compatible name used throughout the existing frontend. */
+export type Role = UserRole
 
 export interface User {
   id: Id

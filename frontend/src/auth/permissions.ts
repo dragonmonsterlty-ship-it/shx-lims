@@ -6,7 +6,9 @@ export const roleLabel: Record<Role, string> = {
   admin: '系统管理员',
   director: '主管',
   project_manager: '项目负责人',
+  researcher: '研究员',
   operator: '操作员',
+  viewer: '只读用户',
 }
 
 /** 与后端 PROJECT_OWNER_ROLES 保持一致。 */
@@ -18,7 +20,7 @@ export function isOwnerRole(role: Role): boolean {
 
 /** director 在日报/结果等模块只读；项目模块按本文件细则单独判定。 */
 export function isReadOnly(role: Role): boolean {
-  return role === 'director'
+  return role === 'director' || role === 'viewer'
 }
 
 /**
@@ -26,12 +28,31 @@ export function isReadOnly(role: Role): boolean {
  * 这里只做角色显隐 + 负责人归属判断，不作为业务真相；提交时仍二次校验。
  */
 export const can = {
-  manageUsers: (role: Role) => role === 'admin',
-  viewAdmin: (role: Role) => role === 'admin',
+  manageUsers: (role: Role) => canManageUsers(role),
+  viewAdmin: (role: Role) => canUseAdminRoute(role),
   /** 新建项目：admin / director / project_manager 可见。 */
   createProject: (role: Role) => role === 'admin' || role === 'project_manager',
-  review: (role: Role) => role !== 'operator',
-  writeData: (role: Role) => role !== 'director',
+  review: (role: Role) => role !== 'operator' && role !== 'viewer',
+  writeData: (role: Role) => !isReadOnly(role),
+}
+
+export function canManageUsers(role: Role): boolean {
+  return role === 'admin'
+}
+
+export function canUseAdminRoute(role: Role): boolean {
+  return role === 'admin'
+}
+
+export function canViewAuditLogs(role: Role): boolean {
+  return role === 'admin' || role === 'project_manager'
+}
+
+export function canViewUserAuditTimeline(
+  user: Pick<User, 'id' | 'role'>,
+  targetUserId: Id,
+): boolean {
+  return user.role === 'admin' || user.id === targetUserId
 }
 
 /**
@@ -179,7 +200,7 @@ export function canUploadAttachment(
   scope: ProjectScope,
 ): boolean {
   if (!context.editable) return false
-  if (user.role === 'director') return false
+  if (isReadOnly(user.role)) return false
   if (user.role === 'admin') return true
   if (user.role === 'project_manager') return scope.managed.has(context.projectId)
   if (context.assignedTo != null) return context.assignedTo === user.id
@@ -202,7 +223,7 @@ export function canDeleteAttachment(
 type ReportLike = Pick<DailyReport, 'user_id' | 'project_id' | 'status'>
 
 export function canCreateReport(role: Role): boolean {
-  return role !== 'director'
+  return !isReadOnly(role)
 }
 
 export function canViewReport(user: User, r: ReportLike, scope: ProjectScope): boolean {
@@ -216,7 +237,11 @@ export function canViewReport(user: User, r: ReportLike, scope: ProjectScope): b
 
 /** 仅本人、且状态为草稿或已退回时可编辑/提交。 */
 export function canEditReport(user: User, r: ReportLike): boolean {
-  return r.user_id === user.id && (r.status === 'draft' || r.status === 'returned')
+  return (
+    !isReadOnly(user.role) &&
+    r.user_id === user.id &&
+    (r.status === 'draft' || r.status === 'returned')
+  )
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   FileTextOutlined,
   MedicineBoxOutlined,
   ProjectOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 import { createElement, type ReactNode } from 'react'
@@ -28,7 +29,18 @@ const ALL_MENU: AppMenuItem[] = [
   { path: '/samples', name: '样品管理', icon: createElement(ContainerOutlined) },
   { path: '/testing', name: '检测与审核', icon: createElement(AuditOutlined) },
   { path: '/inventory', name: '试剂库存', icon: createElement(MedicineBoxOutlined) },
-  { path: '/admin', name: '系统管理', icon: createElement(SettingOutlined), roles: ['admin'] },
+  {
+    path: '/admin/users',
+    name: '管理员管理',
+    icon: createElement(SettingOutlined),
+    roles: ['admin'],
+  },
+  {
+    path: '/audit-logs',
+    name: '审计日志',
+    icon: createElement(SafetyCertificateOutlined),
+    roles: ['admin', 'project_manager'],
+  },
 ]
 
 export function buildMenu(role: Role): AppMenuItem[] {

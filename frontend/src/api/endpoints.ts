@@ -13,6 +13,17 @@ export const endpoints = {
     list: '/users',
     projectOwnerCandidates: '/users/project-owner-candidates',
   },
+  auditLogs: {
+    root: '/audit-logs',
+    entity: (entityType: string, entityId: number) =>
+      `/audit-logs/entity/${encodeURIComponent(entityType)}/${entityId}`,
+  },
+  adminUsers: {
+    root: '/admin/users',
+    status: (userId: number) => `/admin/users/${userId}/status`,
+    role: (userId: number) => `/admin/users/${userId}/role`,
+    resetPassword: (userId: number) => `/admin/users/${userId}/reset-password`,
+  },
   projects: {
     root: '/projects',
     detail: (id: number) => `/projects/${id}`,

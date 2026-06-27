@@ -35,14 +35,15 @@ describe('backend adapters', () => {
     expect(normalizeRole('principal_investigator')).toBe('project_manager')
     expect(normalizeRole('admin')).toBe('admin')
     expect(normalizeRole('director')).toBe('director')
-    expect(normalizeRole('researcher')).toBe('operator')
-    expect(normalizeRole('unknown_role')).toBe('operator')
-    expect(normalizeRole(undefined)).toBe('operator')
+    expect(normalizeRole('researcher')).toBe('researcher')
+    expect(normalizeRole('viewer')).toBe('viewer')
+    expect(normalizeRole('unknown_role')).toBe('viewer')
+    expect(normalizeRole(undefined)).toBe('viewer')
   })
 
   it('adaptUser maps a backend pm role to project_manager', () => {
     expect(adaptUser({ id: 1, username: 'm', role: 'pm' }).role).toBe('project_manager')
-    expect(adaptUser({ id: 2, username: 'r', role: 'researcher' }).role).toBe('operator')
+    expect(adaptUser({ id: 2, username: 'r', role: 'researcher' }).role).toBe('researcher')
   })
 
   it('maps experiment create payload to the backend experiment-records contract', () => {

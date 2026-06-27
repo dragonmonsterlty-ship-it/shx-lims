@@ -20,7 +20,8 @@ const InventoryDetailPage = lazy(() => import('../pages/inventory/InventoryDetai
 const SampleListPage = lazy(() => import('../pages/samples/SampleListPage'))
 const SampleDetailPage = lazy(() => import('../pages/samples/SampleDetailPage'))
 const TestingReviewPage = lazy(() => import('../pages/testing/TestingReviewPage'))
-const AdminPage = lazy(() => import('../pages/admin/AdminPage'))
+const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'))
+const AuditLogPage = lazy(() => import('../pages/audit/AuditLogPage'))
 const ForbiddenPage = lazy(() => import('../pages/error/ForbiddenPage'))
 const NotFoundPage = lazy(() => import('../pages/error/NotFoundPage'))
 
@@ -51,7 +52,14 @@ export const router = createBrowserRouter([
           { path: 'testing', element: withSuspense(<TestingReviewPage />) },
           {
             element: <RoleGuard allow={['admin']} />,
-            children: [{ path: 'admin', element: withSuspense(<AdminPage />) }],
+            children: [
+              { path: 'admin', element: <Navigate to="/admin/users" replace /> },
+              { path: 'admin/users', element: withSuspense(<AdminUsersPage />) },
+            ],
+          },
+          {
+            element: <RoleGuard allow={['admin', 'project_manager']} />,
+            children: [{ path: 'audit-logs', element: withSuspense(<AuditLogPage />) }],
           },
           { path: '403', element: withSuspense(<ForbiddenPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },
