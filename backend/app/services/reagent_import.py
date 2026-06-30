@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.business import InventoryTxn, Reagent, ReagentLot
 from app.models.user import User
-from app.services.reagents import ensure_can_manage_reagent_master
+from app.services.reagents import ensure_can_import_reagent_inventory
 
 
 IMPORT_HEADERS = [
@@ -83,7 +83,7 @@ def import_reagents(
     content: bytes,
     dry_run: bool,
 ) -> dict:
-    ensure_can_manage_reagent_master(current_user)
+    ensure_can_import_reagent_inventory(current_user)
     extension = Path(filename or "").suffix.lower()
     if extension not in {".csv", ".xlsx"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅支持 .csv 和 .xlsx 文件")

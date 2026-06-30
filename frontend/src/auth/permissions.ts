@@ -147,6 +147,16 @@ export function canManageInventory(role: Role): boolean {
   return role === 'admin' || role === 'director'
 }
 
+/** 批量导入库存：admin / director / project_manager / operator。 */
+export function canImportInventory(role: Role): boolean {
+  return (
+    role === 'admin' ||
+    role === 'director' ||
+    role === 'project_manager' ||
+    role === 'operator'
+  )
+}
+
 // ---------- 样品 / 检测 / 结果权限 ----------
 
 export function canManageSample(

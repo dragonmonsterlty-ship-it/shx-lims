@@ -9,6 +9,8 @@ import {
   canCreateReport,
   canExecuteTestTask,
   canManageSample,
+  canImportInventory,
+  canManageInventory,
   canReviewTestResult,
   canUseAdminRoute,
   canUploadAttachment,
@@ -141,5 +143,16 @@ describe('role terminology', () => {
         scope,
       ),
     ).toBe(false)
+  })
+
+  it('allows operators and managers to import without broader inventory management', () => {
+    expect(canImportInventory('admin')).toBe(true)
+    expect(canImportInventory('director')).toBe(true)
+    expect(canImportInventory('operator')).toBe(true)
+    expect(canManageInventory('operator')).toBe(false)
+    expect(canImportInventory('project_manager')).toBe(true)
+    expect(canManageInventory('project_manager')).toBe(false)
+    expect(canImportInventory('researcher')).toBe(false)
+    expect(canImportInventory('viewer')).toBe(false)
   })
 })

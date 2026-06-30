@@ -61,7 +61,7 @@ def download_reagent_import_template(
     current_user: CurrentUser,
     format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
 ) -> Response:
-    reagent_service.ensure_can_manage_reagent_master(current_user)
+    reagent_service.ensure_can_import_reagent_inventory(current_user)
     content, media_type, filename = reagent_import_service.build_template(format)
     return Response(
         content=content,

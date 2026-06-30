@@ -11,10 +11,11 @@ import {
   type BackendReagentLot,
 } from '../api/adapters'
 import { unwrap, USE_MOCK } from '../api/client'
-import { createApiError } from '../api/errors'
+import { createApiError, normalizeApiError } from '../api/errors'
 import { endpoints } from '../api/endpoints'
-import { request } from '../api/http'
+import { httpClient, request } from '../api/http'
 import { mockServer } from '../api/mock'
+import { filenameFromContentDisposition } from './attachment'
 import type {
   AdjustInput,
   BatchInput,
@@ -28,6 +29,8 @@ import type {
   NewBatchInput,
   PageResult,
   ReagentInput,
+  ReagentImportResult,
+  ReagentImportTemplateFormat,
 } from '../types'
 
 export async function listMaterials(): Promise<Material[]> {
@@ -239,6 +242,54 @@ export async function setFrozen(batchId: Id, frozen: boolean, actorId: Id): Prom
   throw createApiError({ code: 405, message: '当前后端契约不支持冻结/解冻批次' })
 }
 
+export async function downloadReagentImportTemplate(
+  format: ReagentImportTemplateFormat,
+): Promise<void> {
+  if (USE_MOCK) {
+    throw createApiError({ code: 405, message: 'mock 模式暂不支持下载导入模板' })
+  }
+  try {
+    const response = await httpClient.request<Blob>({
+      method: 'GET',
+      url: endpoints.reagents.importTemplate,
+      params: { format },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download =
+      filenameFromContentDisposition(response.headers?.['content-disposition']) ??
+      `reagent-import-template.${format}`
+    document.body.appendChild(anchor)
+    try {
+      anchor.click()
+    } finally {
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    }
+  } catch (error) {
+    throw normalizeApiError(error)
+  }
+}
+
+export async function importReagentInventory(
+  file: File,
+  dryRun: boolean,
+): Promise<ReagentImportResult> {
+  if (USE_MOCK) {
+    throw createApiError({ code: 405, message: 'mock 模式暂不支持试剂库存导入' })
+  }
+  const formData = new FormData()
+  formData.append('file', file)
+  return request<ReagentImportResult>({
+    method: 'POST',
+    url: endpoints.reagents.importInventory,
+    params: { dry_run: dryRun },
+    data: formData,
+  })
+}
+
 function toBackendLotStatus(status?: InventoryListQuery['status']): string | undefined {
   if (!status || status === 'low') return undefined
   if (status === 'normal') return 'in_stock'
@@ -260,4 +311,6 @@ export const inventoryService = {
   inbound,
   adjust,
   setFrozen,
+  downloadReagentImportTemplate,
+  importReagentInventory,
 }

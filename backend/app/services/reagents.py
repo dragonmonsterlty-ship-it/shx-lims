@@ -28,6 +28,11 @@ def ensure_can_manage_reagent_master(user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Reagent master data permission required")
 
 
+def ensure_can_import_reagent_inventory(user: User) -> None:
+    if user.role not in {"admin", "director", "project_manager", "operator"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Reagent inventory import permission required")
+
+
 def ensure_can_operate_inventory(user: User) -> None:
     if user.role not in {"admin", "director"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inventory operation permission required")

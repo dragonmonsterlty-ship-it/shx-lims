@@ -275,15 +275,29 @@ def test_corrupt_xlsx_returns_safe_parse_error(client, create_user):
     assert response.json()["message"] == "文件内容无法解析"
 
 
-def test_import_requires_authentication_and_manage_permission(client, create_user):
+def test_operator_and_manager_can_import_while_unauthenticated_is_forbidden(client, create_user):
     setup_users(create_user)
     upload = csv_file([row()])
 
     unauthenticated = import_file(client, {}, upload)
-    forbidden = import_file(client, auth_headers(client, "operator"), upload)
+    operator_template = client.get(
+        "/api/reagents/import-template",
+        params={"format": "csv"},
+        headers=auth_headers(client, "operator"),
+    )
+    operator_import = import_file(client, auth_headers(client, "operator"), upload)
+    manager_import = import_file(
+        client,
+        auth_headers(client, "manager"),
+        csv_file([row(lot_no="LOT-MANAGER")]),
+    )
 
     assert unauthenticated.status_code == 401
-    assert forbidden.status_code == 403
+    assert operator_template.status_code == 200
+    assert operator_import.status_code == 200
+    assert operator_import.json()["data"]["valid_rows"] == 1
+    assert manager_import.status_code == 200
+    assert manager_import.json()["data"]["valid_rows"] == 1
 
 
 def test_formal_import_with_any_error_rolls_back_all_rows(client, create_user, db_session):
