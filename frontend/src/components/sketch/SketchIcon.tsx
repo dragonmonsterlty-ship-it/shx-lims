@@ -19,6 +19,10 @@ export type SketchIconName =
   | 'sparkle'
   | 'reagent'
   | 'empty-box'
+  | 'benzene'
+  | 'ball-stick'
+  | 'drug-molecule'
+  | 'hex-molecule'
 
 export interface SketchIconProps {
   name: SketchIconName
@@ -131,6 +135,54 @@ const PATHS: Record<SketchIconName, ReactNode> = {
       <path d="M9 8 L15 8" />
       {/* 内沿（强调空） */}
       <path d="M7 11.2 q5 1.4 10 0" />
+    </>
+  ),
+  benzene: (
+    <>
+      {/* 苯环（六边形 + 内圆） */}
+      <path d="M12 5.2 L16.3 7.8 L16.2 13 L11.9 15.6 L7.7 13 L7.8 7.8 Z" />
+      <circle cx="12" cy="10.4" r="3.4" />
+      {/* 三个双键（交替） */}
+      <path d="M11.8 6.4 L15.2 8.4" />
+      <path d="M15 12.8 L11.8 14.6" />
+      <path d="M8.8 12.7 L8.9 8.6" />
+    </>
+  ),
+  'ball-stick': (
+    <>
+      {/* 球棍模型（极简三原子） */}
+      <circle cx="7.2" cy="10.4" r="2.1" />
+      <circle cx="12" cy="8.6" r="1.9" />
+      <circle cx="16.6" cy="12.8" r="2.2" />
+      {/* 连线（棍） */}
+      <path d="M8.9 9.4 L10.4 9" />
+      <path d="M13.6 9.6 L15 11.4" />
+    </>
+  ),
+  'drug-molecule': (
+    <>
+      {/* 抽象药物分子（多环 + 取代基） */}
+      <path d="M7.4 8.2 L10.6 6.8 L13.8 8.3 L13.7 11.9 L10.5 13.3 L7.3 11.8 Z" />
+      <path d="M13.8 8.3 L17.2 9.6 L17.1 13.1 L13.7 11.9" />
+      <circle cx="10.5" cy="6.8" r="0.6" />
+      <circle cx="7.3" cy="11.8" r="0.6" />
+      {/* 侧链基团 */}
+      <path d="M17.1 11.3 L19.6 11.2" />
+      <circle cx="19.8" cy="11.2" r="0.8" />
+      <path d="M7.4 8.2 L5.1 6.9" />
+      <circle cx="4.6" cy="6.4" r="0.7" />
+    </>
+  ),
+  'hex-molecule': (
+    <>
+      {/* 杂环分子（六元环 + N/O 标识点） */}
+      <path d="M12 5.8 L15.8 8 L15.7 12.4 L11.9 14.6 L8.2 12.4 L8.3 8 Z" />
+      {/* 杂原子位置（用小圆标识） */}
+      <circle cx="12" cy="5.8" r="0.8" />
+      <circle cx="11.9" cy="14.6" r="0.8" />
+      {/* 取代基 */}
+      <path d="M15.8 10.2 L18.4 10.1" />
+      <circle cx="19" cy="10.1" r="0.9" />
     </>
   ),
 }

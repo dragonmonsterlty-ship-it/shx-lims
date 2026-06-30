@@ -28,6 +28,11 @@ const DECORATIONS: Array<{
   { name: 'sparkle', size: 40, color: '#C2853B', opacity: 0.6, rotate: 0, style: { top: '24%', left: '46%' } },
   { name: 'sparkle', size: 30, color: '#2B4C7E', opacity: 0.5, rotate: 0, style: { bottom: '22%', left: '40%' } },
   { name: 'sparkle', size: 34, color: '#4A7C59', opacity: 0.5, rotate: 0, style: { top: '60%', right: '20%' } },
+  // 化学分子类装饰
+  { name: 'benzene', size: 72, color: '#2B4C7E', opacity: 0.38, rotate: 15, style: { top: '48%', left: '18%' } },
+  { name: 'ball-stick', size: 68, color: '#4A7C59', opacity: 0.4, rotate: -10, style: { bottom: '42%', right: '16%' } },
+  { name: 'drug-molecule', size: 76, color: '#333', opacity: 0.36, rotate: 8, style: { top: '68%', left: '8%' } },
+  { name: 'hex-molecule', size: 64, color: '#2B4C7E', opacity: 0.35, rotate: -12, style: { top: '26%', right: '32%' } },
 ]
 
 function LoginDecorations() {
