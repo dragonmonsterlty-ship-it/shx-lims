@@ -11,6 +11,15 @@ export interface AdminUser {
   must_change_password: boolean
 }
 
+export interface AdminUserCreate {
+  username: string
+  display_name: string
+  email?: string
+  password: string
+  role: UserRole
+  is_active: boolean
+}
+
 export interface UserStatusUpdate {
   is_active: boolean
 }

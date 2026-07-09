@@ -1,11 +1,19 @@
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
-import type { AdminUser, PasswordResetResult, UserRole } from '../types'
+import type { AdminUser, AdminUserCreate, PasswordResetResult, UserRole } from '../types'
 
 export function listAdminUsers(): Promise<AdminUser[]> {
   return request<AdminUser[]>({
     method: 'GET',
     url: endpoints.adminUsers.root,
+  })
+}
+
+export function createAdminUser(payload: AdminUserCreate): Promise<AdminUser> {
+  return request<AdminUser>({
+    method: 'POST',
+    url: endpoints.adminUsers.root,
+    data: payload,
   })
 }
 
@@ -38,6 +46,7 @@ export function resetUserPassword(
 
 export const adminService = {
   listAdminUsers,
+  createAdminUser,
   updateUserStatus,
   updateUserRole,
   resetUserPassword,

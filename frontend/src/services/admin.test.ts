@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { request } from '../api/http'
 import {
+  createAdminUser,
   listAdminUsers,
   resetUserPassword,
   updateUserRole,
@@ -23,6 +24,26 @@ describe('admin service T1.6B contract', () => {
     expect(mockedRequest).toHaveBeenCalledWith({
       method: 'GET',
       url: '/admin/users',
+    })
+  })
+
+  it('creates an admin-managed user through the users endpoint', async () => {
+    mockedRequest.mockResolvedValueOnce({})
+    const payload = {
+      username: 'new_operator',
+      display_name: 'New Operator',
+      email: 'new.operator@example.com',
+      password: 'initial-pass-123',
+      role: 'operator' as const,
+      is_active: true,
+    }
+
+    await createAdminUser(payload)
+
+    expect(mockedRequest).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/admin/users',
+      data: payload,
     })
   })
 
