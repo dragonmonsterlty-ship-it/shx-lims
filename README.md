@@ -35,6 +35,18 @@ Copy-Item .env.example frontend\.env
 .\scripts\verify-fullstack.ps1
 ```
 
+## 内网试用部署
+
+在一台 Windows 电脑上向同一内网开放 LIMS 前端和 API：
+
+```powershell
+.\scripts\start-lan-demo.ps1 -HostIP 192.168.3.50
+```
+
+部署前提、防火墙配置、验证、常见错误和回滚步骤见
+[`docs/lan-deploy.md`](docs/lan-deploy.md)。PostgreSQL 保持仅部署机本地可访问，
+普通内网用户只需访问前端 `5173` 端口。
+
 ## API 模式
 
 - `frontend/.env` 的 `VITE_API_MODE=real` → 连真实后端(`VITE_API_BASE_URL`)。

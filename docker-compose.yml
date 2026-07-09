@@ -6,7 +6,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lims}
       POSTGRES_DB: ${POSTGRES_DB:-lims}
     ports:
-      - "15432:5432"
+      # 仅供部署机后端访问，不作为普通内网用户入口。
+      - "127.0.0.1:15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
