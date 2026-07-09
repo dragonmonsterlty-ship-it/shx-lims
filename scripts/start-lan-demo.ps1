@@ -37,6 +37,23 @@ $apiBase = "http://$HostIP`:18000/api"
 $frontendOrigin = "http://$HostIP`:5173"
 $corsOrigins = "http://localhost:5173,http://127.0.0.1:5173,$frontendOrigin"
 
+$secretKey = $env:SECRET_KEY
+if (-not $secretKey) {
+  foreach ($envFile in @((Join-Path $backendDir '.env'), (Join-Path $root '.env'))) {
+    if (-not (Test-Path -LiteralPath $envFile)) { continue }
+    $secretLine = Get-Content -LiteralPath $envFile -Encoding UTF8 |
+      Where-Object { $_ -match '^\s*SECRET_KEY\s*=' } |
+      Select-Object -First 1
+    if ($secretLine) {
+      $secretKey = ($secretLine -split '=', 2)[1].Trim().Trim('"').Trim("'")
+      break
+    }
+  }
+}
+if (-not $secretKey -or $secretKey -eq 'change-this-development-secret') {
+  throw 'SECRET_KEY must be set to a non-default value for LAN demo. Generate one with: [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))'
+}
+
 $databaseUrl = $env:DATABASE_URL
 if (-not $databaseUrl) {
   foreach ($envFile in @((Join-Path $backendDir '.env'), (Join-Path $root '.env'))) {
@@ -65,6 +82,8 @@ try {
 $backendCommand = @"
 Set-Location -LiteralPath '$($backendDir.Replace("'", "''"))'
 `$env:BACKEND_PORT = '18000'
+`$env:APP_ENV = 'staging'
+`$env:SECRET_KEY = '$($secretKey.Replace("'", "''"))'
 `$env:CORS_ORIGINS = '$corsOrigins'
 `$env:DATABASE_URL = '$($databaseUrl.Replace("'", "''"))'
 & '.\.venv\Scripts\python.exe' -m alembic upgrade head

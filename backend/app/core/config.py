@@ -74,6 +74,13 @@ class Settings(BaseSettings):
             raise ValueError("T1.6A attachments only support local storage backend")
         return self
 
+    @model_validator(mode="after")
+    def reject_default_secret_outside_development(self) -> "Settings":
+        safe_envs = {"development", "test"}
+        if self.app_env.strip().lower() not in safe_envs and self.secret_key == "change-this-development-secret":
+            raise ValueError("SECRET_KEY must be changed before starting outside development or test")
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:

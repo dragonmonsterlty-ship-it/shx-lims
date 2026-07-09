@@ -83,6 +83,29 @@ def test_change_password_clears_must_change_password_and_revokes_refresh_tokens(
     assert new_login_response.json()["data"]["must_change_password"] is False
 
 
+def test_must_change_password_blocks_business_endpoints_but_allows_password_change(client, create_user):
+    create_user(username="operator", password="password123", role="operator", must_change_password=True)
+    login_body = login(client, username="operator").json()["data"]
+    headers = {"Authorization": f"Bearer {login_body['access_token']}"}
+
+    blocked_response = client.get("/api/users/me", headers=headers)
+
+    assert blocked_response.status_code == 403
+    assert blocked_response.json()["message"] == "Password change required"
+
+    change_response = client.post(
+        "/api/auth/change-password",
+        headers=headers,
+        json={"old_password": "password123", "new_password": "new-password123"},
+    )
+
+    assert change_response.status_code == 200
+
+    allowed_response = client.get("/api/users/me", headers=headers)
+    assert allowed_response.status_code == 200
+    assert allowed_response.json()["data"]["must_change_password"] is False
+
+
 def test_users_me_requires_login(client):
     response = client.get("/api/users/me")
 
