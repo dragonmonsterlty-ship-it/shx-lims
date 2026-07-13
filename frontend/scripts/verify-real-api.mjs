@@ -68,12 +68,12 @@ function assertTimeline(name, value, entityType, entityId) {
   }
 }
 
-function assertManagerAuditScope(value, projectIds, forbiddenEntityIds) {
+function assertManagerAuditScope(value, projectIds, forbiddenEntities) {
   assertPage('project_manager audit logs', value)
   if (value.items.some((item) => !projectIds.has(item.project_id))) {
     throw new Error('project_manager audit logs escaped the managed project scope')
   }
-  if (value.items.some((item) => forbiddenEntityIds.has(item.entity_id))) {
+  if (value.items.some((item) => forbiddenEntities.has(`${item.entity_type}:${item.entity_id}`))) {
     throw new Error('project_manager audit logs exposed a cross-project entity')
   }
 }
@@ -457,7 +457,11 @@ const managerAuditLogs = await api('/audit-logs?page=1&page_size=100', {
 assertManagerAuditScope(
   managerAuditLogs,
   new Set(managerProjects.items.map((item) => item.id)),
-  new Set([crossExperiment.id, crossReport.id, crossSample.id]),
+  new Set([
+    `experiment:${crossExperiment.id}`,
+    `daily_report:${crossReport.id}`,
+    `sample:${crossSample.id}`,
+  ]),
 )
 
 console.log(

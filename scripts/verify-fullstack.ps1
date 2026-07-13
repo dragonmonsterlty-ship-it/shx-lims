@@ -4,14 +4,25 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $base = if ($env:VITE_API_BASE_URL) { $env:VITE_API_BASE_URL } else { 'http://127.0.0.1:18000/api' }
 
+function Assert-NativeExitCode($command, $exitCode) {
+  if ($exitCode -ne 0) { throw "$command failed with exit code $exitCode." }
+}
+
 Write-Host '== Frontend: typecheck / lint / test / build =='
 Push-Location (Join-Path $root 'frontend')
 try {
-  if (-not (Test-Path '.\node_modules')) { npm install }
+  if (-not (Test-Path '.\node_modules')) {
+    npm install
+    Assert-NativeExitCode 'npm install' $LASTEXITCODE
+  }
   npm run typecheck
+  Assert-NativeExitCode 'npm run typecheck' $LASTEXITCODE
   npm run lint
+  Assert-NativeExitCode 'npm run lint' $LASTEXITCODE
   npm run test
+  Assert-NativeExitCode 'npm run test' $LASTEXITCODE
   npm run build
+  Assert-NativeExitCode 'npm run build' $LASTEXITCODE
 } finally { Pop-Location }
 
 Write-Host '== Backend: compileall / pytest =='
@@ -19,8 +30,10 @@ Push-Location (Join-Path $root 'backend')
 try {
   $py = '.\.venv\Scripts\python.exe'
   & $py -m compileall app
+  Assert-NativeExitCode 'backend compileall' $LASTEXITCODE
   $env:TEST_DATABASE_URL = 'sqlite+pysqlite:///:memory:'
   & $py -m pytest -q
+  Assert-NativeExitCode 'backend pytest' $LASTEXITCODE
 } finally { Pop-Location }
 
 Write-Host "== Full-stack smoke ($base) =="
@@ -130,6 +143,7 @@ Push-Location (Join-Path $root 'frontend')
 try {
   $env:VITE_API_BASE_URL = $base
   npm run verify:api
+  Assert-NativeExitCode 'npm run verify:api' $LASTEXITCODE
 } finally { Pop-Location }
 Write-Host '== T1.9.2 admin and audit RC smoke =='
 $managerToken = (Invoke-Api POST '/auth/login' $null @{ username = 'project_manager'; password = 'password123' }).data.access_token
