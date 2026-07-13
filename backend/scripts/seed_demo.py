@@ -37,7 +37,7 @@ from app.services import testing as testing_service  # noqa: E402
 DEFAULT_PASSWORD = "password123"
 
 
-def user(db, username: str, full_name: str, role: str, department: str) -> User:
+def user(db, username: str, full_name: str, role: str, department: str, modules: str = "lims") -> User:
     existing = db.query(User).filter(User.username == username).one_or_none()
     if existing is not None:
         existing.full_name = full_name
@@ -45,6 +45,7 @@ def user(db, username: str, full_name: str, role: str, department: str) -> User:
         existing.password_hash = hash_password(DEFAULT_PASSWORD)
         existing.role = role
         existing.department = department
+        existing.modules = modules
         existing.is_active = True
         existing.must_change_password = False
         return existing
@@ -55,6 +56,7 @@ def user(db, username: str, full_name: str, role: str, department: str) -> User:
         password_hash=hash_password(DEFAULT_PASSWORD),
         role=role,
         department=department,
+        modules=modules,
         is_active=True,
         must_change_password=False,
     )
@@ -485,13 +487,14 @@ def browser_workflow(
 
 
 def seed_database(db) -> None:
-    admin = user(db, "admin", "Demo Admin", "admin", "System")
+    admin = user(db, "admin", "Demo Admin", "admin", "System", "lims,refstd")
     director = user(db, "director", "演示主管", "director", "Management")
     manager = user(db, "project_manager", "演示项目负责人", "project_manager", "Chemistry")
     deactivate_legacy_pm_account(db)
     researcher = user(db, "researcher", "Demo Researcher", "operator", "Chemistry")
     operator = user(db, "operator", "Demo Operator", "operator", "Lab")
     analyst = user(db, "analyst", "Demo Analyst", "operator", "Analytical")
+    user(db, "qc_operator", "Demo QC Operator", "operator", "QC", "refstd")
 
     first_project = project(db, "DEMO-001", "MVP Demo Project A", manager, admin.id)
     second_project = project(db, "DEMO-002", "MVP Demo Project B", manager, admin.id)

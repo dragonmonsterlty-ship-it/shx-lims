@@ -17,7 +17,9 @@ def test_demo_seed_builds_stable_browser_walkthrough_data(db_session):
     seed_demo.seed_database(db_session)
 
     users = {item.username: item for item in db_session.query(User).all()}
-    assert {"admin", "project_manager", "analyst", "operator"} <= users.keys()
+    assert {"admin", "project_manager", "analyst", "operator", "qc_operator"} <= users.keys()
+    assert users["qc_operator"].role == "operator"
+    assert users["qc_operator"].modules == "refstd"
 
     projects = db_session.query(Project).order_by(Project.project_code).all()
     assert [(item.project_code, item.name) for item in projects] == [
@@ -67,6 +69,7 @@ def test_demo_walkthrough_documents_commands_accounts_and_roles():
         "project_manager",
         "analyst",
         "operator",
+        "qc_operator",
         "附件",
         "verify:api",
         "仅用于本地 demo/dev",
