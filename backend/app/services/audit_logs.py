@@ -190,6 +190,11 @@ def ensure_entity_access(db: Session, current_user: User, entity_type: str, enti
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
         resolve_attachment_entity(db, current_user, attachment.entity_type, attachment.entity_id, action="read")
         return
+    if entity_type == "ref_standard":
+        from app.services import ref_standards
+
+        ref_standards.read_ref_standard(db, current_user, entity_id)
+        return
     if entity_type == "user":
         if is_admin(current_user) or current_user.id == entity_id:
             return

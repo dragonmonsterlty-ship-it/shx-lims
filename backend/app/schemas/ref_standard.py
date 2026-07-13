@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class RefStandardSource(StrEnum):
@@ -97,6 +97,14 @@ class RefStandardRead(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     is_deleted: bool
+
+    @field_serializer("created_at", "updated_at", when_used="json")
+    def serialize_utc_datetime(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 class RefStandardPage(BaseModel):

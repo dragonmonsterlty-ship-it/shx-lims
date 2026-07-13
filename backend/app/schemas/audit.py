@@ -14,6 +14,7 @@ AUDIT_ACTIONS = {
     "archive",
     "upload",
     "download",
+    "dispose",
     "enable_user",
     "disable_user",
     "change_role",
@@ -28,6 +29,7 @@ AUDIT_ENTITY_TYPES = {
     "test_result",
     "attachment",
     "user",
+    "ref_standard",
 }
 
 
