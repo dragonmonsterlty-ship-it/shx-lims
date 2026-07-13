@@ -73,6 +73,7 @@ def create_user(db_session: Session):
         username: str = "admin",
         password: str = "password123",
         role: str = "admin",
+        modules: str = "lims",
         must_change_password: bool = True,
     ) -> User:
         user = User(
@@ -82,6 +83,7 @@ def create_user(db_session: Session):
             password_hash=hash_password(password),
             role=role,
             department=None,
+            modules=modules,
             is_active=True,
             must_change_password=must_change_password,
         )

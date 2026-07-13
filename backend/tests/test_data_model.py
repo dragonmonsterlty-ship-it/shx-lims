@@ -184,3 +184,54 @@ def test_alembic_upgrade_head_creates_data_model_tables(tmp_path):
     finally:
         engine.dispose()
     assert DATA_MODEL_TABLES.issubset(table_names)
+
+
+def test_user_modules_migration_backfills_existing_users(tmp_path):
+    db_path = tmp_path / "modules-migration.db"
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{db_path.as_posix()}"
+    env.setdefault("SECRET_KEY", "test-secret-key-that-is-long-enough")
+    backend_dir = Path(__file__).resolve().parents[1]
+
+    before = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "202606290001"],
+        cwd=backend_dir,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert before.returncode == 0, before.stderr
+
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                'INSERT INTO "user" '
+                "(username, full_name, password_hash, role, is_active, must_change_password) "
+                "VALUES ('legacy-user', 'Legacy User', 'hash', 'operator', 1, 0)"
+            )
+        )
+    engine.dispose()
+
+    after = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert after.returncode == 0, after.stderr
+
+    engine = create_engine(env["DATABASE_URL"])
+    try:
+        with engine.connect() as connection:
+            modules = connection.execute(
+                text('SELECT modules FROM "user" WHERE username = \'legacy-user\'')
+            ).scalar_one()
+    finally:
+        engine.dispose()
+    assert modules == "lims"

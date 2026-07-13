@@ -18,6 +18,16 @@ def test_login_success(client, create_user):
     assert body["data"]["refresh_token"]
     assert body["data"]["must_change_password"] is True
     assert body["data"]["user"]["username"] == "admin"
+    assert body["data"]["user"]["modules"] == ["lims", "refstd"]
+
+
+def test_login_returns_non_admin_modules_as_array(client, create_user):
+    create_user(username="qc_user", role="operator", modules="refstd", must_change_password=False)
+
+    response = login(client, username="qc_user")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["user"]["modules"] == ["refstd"]
 
 
 def test_login_wrong_password_fails(client, create_user):
