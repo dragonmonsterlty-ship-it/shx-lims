@@ -1,9 +1,12 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.modules import ALL_MODULES, normalize_modules, parse_modules
 
 
 UserRoleValue = Literal["admin", "director", "project_manager", "researcher", "operator", "viewer"]
+UserModuleValue = Literal["lims", "refstd"]
 
 
 class AdminUserCreate(BaseModel):
@@ -13,6 +16,7 @@ class AdminUserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=255)
     role: UserRoleValue
     is_active: bool = True
+    modules: list[UserModuleValue] = Field(default_factory=lambda: ["lims"], min_length=1, max_length=2)
 
     @field_validator("username", "display_name")
     @classmethod
@@ -35,6 +39,20 @@ class AdminUserCreate(BaseModel):
             raise ValueError("invalid email address")
         return value
 
+    @field_validator("modules")
+    @classmethod
+    def validate_modules(cls, value: list[UserModuleValue]) -> list[UserModuleValue]:
+        return normalize_modules(value)
+
+
+class UserModulesUpdate(BaseModel):
+    modules: list[UserModuleValue] = Field(min_length=1, max_length=2)
+
+    @field_validator("modules")
+    @classmethod
+    def validate_modules(cls, value: list[UserModuleValue]) -> list[UserModuleValue]:
+        return normalize_modules(value)
+
 
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -44,6 +62,20 @@ class UserRead(BaseModel):
     full_name: str
     email: str | None = None
     role: str
+    modules: list[UserModuleValue]
     department: str | None = None
     is_active: bool
     must_change_password: bool
+
+    @field_validator("modules", mode="before")
+    @classmethod
+    def deserialize_modules(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return parse_modules(value)
+        return normalize_modules(value)
+
+    @model_validator(mode="after")
+    def grant_admin_all_modules(self) -> "UserRead":
+        if self.role == "admin":
+            self.modules = list(ALL_MODULES)
+        return self

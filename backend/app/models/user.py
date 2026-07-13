@@ -16,6 +16,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(64), nullable=False)
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    modules: Mapped[str] = mapped_column(String(100), nullable=False, server_default="lims", default="lims")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

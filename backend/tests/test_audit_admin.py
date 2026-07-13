@@ -270,6 +270,7 @@ def test_admin_can_create_user_with_hashed_password_audit_and_login(client, crea
     assert body["role"] == "operator"
     assert body["is_active"] is True
     assert body["must_change_password"] is True
+    assert body["modules"] == ["lims"]
     assert "password" not in body
     assert "password_hash" not in body
 
@@ -292,6 +293,7 @@ def test_admin_can_create_user_with_hashed_password_audit_and_login(client, crea
         "username": "new_operator",
         "role": "operator",
         "is_active": True,
+        "modules": ["lims"],
     }
     assert log.created_at is not None
 
