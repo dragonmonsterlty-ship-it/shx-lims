@@ -32,13 +32,15 @@ function audit(actor = 1) {
   }
 }
 
-// ---- users（四角色 + 额外操作员） ----
+// ---- users（四角色 + 额外操作员 + QC 对照品演示账号） ----
+// modules 决定可进入的工作区：lims=实验室，refstd=对照品。admin 无视该字段（拥有全部）。
 export const users: User[] = [
-  { id: 1, username: 'admin', full_name: '系统管理员', email: 'admin@lims.dev', role: 'admin', department: '信息科', is_active: true, must_change_password: false },
-  { id: 2, username: 'director', full_name: '王主管', email: 'director@lims.dev', role: 'director', department: '研发中心', is_active: true, must_change_password: false },
-  { id: 3, username: 'project_manager', full_name: '张负责人', email: 'project_manager@lims.dev', role: 'project_manager', department: '分析一组', is_active: true, must_change_password: false },
-  { id: 4, username: 'op', full_name: '李操作', email: 'op@lims.dev', role: 'operator', department: '分析一组', is_active: true, must_change_password: true },
-  { id: 5, username: 'op2', full_name: '赵操作', email: 'op2@lims.dev', role: 'operator', department: '分析二组', is_active: true, must_change_password: false },
+  { id: 1, username: 'admin', full_name: '系统管理员', email: 'admin@lims.dev', role: 'admin', department: '信息科', modules: ['lims', 'refstd'], is_active: true, must_change_password: false },
+  { id: 2, username: 'director', full_name: '王主管', email: 'director@lims.dev', role: 'director', department: '研发中心', modules: ['lims'], is_active: true, must_change_password: false },
+  { id: 3, username: 'project_manager', full_name: '张负责人', email: 'project_manager@lims.dev', role: 'project_manager', department: '分析一组', modules: ['lims'], is_active: true, must_change_password: false },
+  { id: 4, username: 'op', full_name: '李操作', email: 'op@lims.dev', role: 'operator', department: '分析一组', modules: ['lims'], is_active: true, must_change_password: true },
+  { id: 5, username: 'op2', full_name: '赵操作', email: 'op2@lims.dev', role: 'operator', department: '分析二组', modules: ['lims', 'refstd'], is_active: true, must_change_password: false },
+  { id: 6, username: 'qc', full_name: '钱质检', email: 'qc@lims.dev', role: 'operator', department: 'QC/QA', modules: ['refstd'], is_active: true, must_change_password: false },
 ]
 
 // ---- projects ----
