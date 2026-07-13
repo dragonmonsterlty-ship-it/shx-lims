@@ -1,6 +1,9 @@
-from sqlalchemy import inspect
+import pytest
+from sqlalchemy import inspect, select
 
+from app.core.security import verify_password
 from app.models.business import AuditLog
+from app.models.user import User
 
 
 def login(client, username: str, password: str = "password123") -> str:
@@ -240,6 +243,107 @@ def test_admin_user_management_writes_audit_and_enforces_admin_only(client, crea
 
     logs = db_session.query(AuditLog).filter(AuditLog.entity_type == "user", AuditLog.entity_id == target_id).all()
     assert [log.action for log in logs] == ["disable_user", "enable_user", "change_role", "reset_password"]
+
+
+def test_admin_can_create_user_with_hashed_password_audit_and_login(client, create_user, db_session):
+    create_user(username="creator_admin", role="admin", must_change_password=False)
+    headers = auth_headers(client, "creator_admin")
+
+    response = client.post(
+        "/api/admin/users",
+        headers=headers,
+        json={
+            "username": "new_operator",
+            "display_name": "New Operator",
+            "email": "new.operator@example.com",
+            "password": "initial-pass-123",
+            "role": "operator",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()["data"]
+    assert body["username"] == "new_operator"
+    assert body["full_name"] == "New Operator"
+    assert body["email"] == "new.operator@example.com"
+    assert body["role"] == "operator"
+    assert body["is_active"] is True
+    assert body["must_change_password"] is True
+    assert "password" not in body
+    assert "password_hash" not in body
+
+    created = db_session.scalar(select(User).where(User.username == "new_operator"))
+    assert created is not None
+    assert created.password_hash != "initial-pass-123"
+    assert verify_password("initial-pass-123", created.password_hash) is True
+
+    log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "create",
+            AuditLog.entity_type == "user",
+            AuditLog.entity_id == created.id,
+        )
+    )
+    assert log is not None
+    assert log.actor_user_id is not None
+    assert log.target_user_id == created.id
+    assert log.after_data == {
+        "username": "new_operator",
+        "role": "operator",
+        "is_active": True,
+    }
+    assert log.created_at is not None
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"username": "new_operator", "password": "initial-pass-123"},
+    )
+    assert login_response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "role",
+    ["director", "project_manager", "researcher", "operator", "viewer", "analyst", "auditor"],
+)
+def test_non_admin_cannot_create_user(client, create_user, role):
+    username = f"create_denied_{role}"
+    create_user(username=username, role=role, must_change_password=False)
+
+    response = client.post(
+        "/api/admin/users",
+        headers=auth_headers(client, username),
+        json={
+            "username": f"forbidden_{role}",
+            "display_name": "Forbidden User",
+            "password": "initial-pass-123",
+            "role": "viewer",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["message"] == "Administrator permission required"
+
+
+def test_admin_create_user_rejects_duplicate_username(client, create_user):
+    create_user(username="duplicate_admin", role="admin", must_change_password=False)
+    create_user(username="existing_user", role="viewer", must_change_password=False)
+
+    response = client.post(
+        "/api/admin/users",
+        headers=auth_headers(client, "duplicate_admin"),
+        json={
+            "username": "existing_user",
+            "display_name": "Duplicate User",
+            "password": "initial-pass-123",
+            "role": "viewer",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == "Username already exists"
 
 
 def test_cancel_and_reject_audit_events(client, create_user):

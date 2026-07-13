@@ -24,7 +24,7 @@ def get_db() -> Session:
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-def get_current_user(
+def get_current_user_allow_pending_password(
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> User:
@@ -43,4 +43,13 @@ def get_current_user(
     return user
 
 
+def get_current_user(
+    current_user: Annotated[User, Depends(get_current_user_allow_pending_password)],
+) -> User:
+    if current_user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password change required")
+    return current_user
+
+
+CurrentUserAllowPendingPassword = Annotated[User, Depends(get_current_user_allow_pending_password)]
 CurrentUser = Annotated[User, Depends(get_current_user)]

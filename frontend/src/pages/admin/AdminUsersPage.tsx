@@ -4,19 +4,21 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components'
-import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Tag } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag } from 'antd'
 import { useRef, useState } from 'react'
 
 import type { ApiError } from '../../api/errors'
 import { roleLabel } from '../../auth/permissions'
 import { SketchEmpty } from '../../components/sketch'
 import {
+  createAdminUser,
   listAdminUsers,
   resetUserPassword,
   updateUserRole,
   updateUserStatus,
 } from '../../services/admin'
-import type { AdminUser, UserRole } from '../../types'
+import type { AdminUser, AdminUserCreate, UserRole } from '../../types'
 
 const ROLE_OPTIONS: { label: string; value: UserRole }[] = (
   ['admin', 'director', 'project_manager', 'researcher', 'operator', 'viewer'] as UserRole[]
@@ -26,16 +28,58 @@ interface ResetPasswordForm {
   new_password: string
 }
 
+type CreateAccountForm = AdminUserCreate
+
 export default function AdminUsersPage() {
   const actionRef = useRef<ActionType>(null)
   const { message, modal } = App.useApp()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
   const [resetting, setResetting] = useState(false)
-  const [form] = Form.useForm<ResetPasswordForm>()
+  const [createForm] = Form.useForm<CreateAccountForm>()
+  const [resetForm] = Form.useForm<ResetPasswordForm>()
 
   const reload = () => actionRef.current?.reload()
   const showError = (error: unknown, fallback: string) => {
     message.error((error as { message?: string }).message ?? fallback)
+  }
+
+  const closeCreateModal = () => {
+    setCreateOpen(false)
+    createForm.resetFields()
+  }
+
+  const submitCreateAccount = async (values: CreateAccountForm) => {
+    setCreating(true)
+    try {
+      await createAdminUser({
+        ...values,
+        username: values.username.trim(),
+        display_name: values.display_name.trim(),
+        email: values.email?.trim() || undefined,
+      })
+      message.success('账号创建成功')
+      closeCreateModal()
+      reload()
+    } catch (error) {
+      const apiError = error as ApiError
+      if (
+        apiError.status === 409 ||
+        apiError.fieldErrors?.username ||
+        /username|用户名/i.test(apiError.message)
+      ) {
+        const duplicateMessage = apiError.fieldErrors?.username || '用户名已存在'
+        createForm.setFields([{ name: 'username', errors: [duplicateMessage] }])
+        message.error(duplicateMessage)
+      } else if (apiError.status === 403) {
+        message.error('权限不足，仅系统管理员可以添加账号')
+      } else {
+        message.error('账号创建失败，请稍后重试')
+      }
+    } finally {
+      setCreating(false)
+    }
   }
 
   const changeRole = (user: AdminUser, role: UserRole) => {
@@ -65,12 +109,12 @@ export default function AdminUsersPage() {
       await resetUserPassword(resetTarget.id, new_password)
       message.success('密码已重置，用户下次登录时必须修改密码')
       setResetTarget(null)
-      form.resetFields()
+      resetForm.resetFields()
       reload()
     } catch (error) {
       const apiError = error as ApiError
       if (apiError.fieldErrors?.new_password) {
-        form.setFields([
+        resetForm.setFields([
           { name: 'new_password', errors: [apiError.fieldErrors.new_password] },
         ])
       } else {
@@ -146,7 +190,7 @@ export default function AdminUsersPage() {
             type="link"
             size="small"
             onClick={() => {
-              form.resetFields()
+              resetForm.resetFields()
               setResetTarget(user)
             }}
           >
@@ -164,6 +208,20 @@ export default function AdminUsersPage() {
         rowKey="id"
         columns={columns}
         search={false}
+        toolBarRender={() => [
+          <Button
+            key="create-account"
+            type="primary"
+            icon={<PlusOutlined />}
+            aria-label="添加账号"
+            onClick={() => {
+              createForm.resetFields()
+              setCreateOpen(true)
+            }}
+          >
+            添加账号
+          </Button>,
+        ]}
         pagination={false}
         options={{ density: true, reload: true, setting: true }}
         scroll={{ x: 1120 }}
@@ -179,19 +237,85 @@ export default function AdminUsersPage() {
       />
 
       <Modal
+        title="添加账号"
+        open={createOpen}
+        confirmLoading={creating}
+        okText="创建账号"
+        cancelText="取消"
+        onOk={() => createForm.submit()}
+        onCancel={closeCreateModal}
+        destroyOnHidden
+      >
+        <Form<CreateAccountForm>
+          form={createForm}
+          layout="vertical"
+          initialValues={{ is_active: true }}
+          onFinish={submitCreateAccount}
+        >
+          <Form.Item
+            name="username"
+            label="用户名"
+            rules={[
+              { required: true, message: '请输入用户名' },
+              { whitespace: true, message: '用户名不能为空' },
+            ]}
+          >
+            <Input autoComplete="username" maxLength={50} />
+          </Form.Item>
+          <Form.Item
+            name="display_name"
+            label="显示名"
+            rules={[
+              { required: true, message: '请输入显示名' },
+              { whitespace: true, message: '显示名不能为空' },
+            ]}
+          >
+            <Input maxLength={100} />
+          </Form.Item>
+          <Form.Item
+            name="email"
+            label="邮箱"
+            rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}
+          >
+            <Input autoComplete="email" maxLength={120} />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="初始密码"
+            rules={[
+              { required: true, message: '请输入初始密码' },
+              { min: 8, message: '初始密码至少 8 位' },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" maxLength={255} placeholder="至少 8 位" />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="角色"
+            rules={[{ required: true, message: '请选择角色' }]}
+          >
+            <Select<UserRole> options={ROLE_OPTIONS} placeholder="请选择角色" />
+          </Form.Item>
+          <Form.Item name="is_active" label="是否启用" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
         title={`重置密码${resetTarget ? `：${resetTarget.full_name}` : ''}`}
         open={!!resetTarget}
         confirmLoading={resetting}
         okText="确认重置"
         cancelText="取消"
-        onOk={() => form.submit()}
+        onOk={() => resetForm.submit()}
         onCancel={() => {
           setResetTarget(null)
-          form.resetFields()
+          resetForm.resetFields()
         }}
-        destroyOnClose
+        destroyOnHidden
       >
-        <Form form={form} layout="vertical" onFinish={submitResetPassword}>
+        <Form form={resetForm} layout="vertical" onFinish={submitResetPassword}>
           <Form.Item
             name="new_password"
             label="新密码"

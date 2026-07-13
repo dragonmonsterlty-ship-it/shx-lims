@@ -147,3 +147,23 @@ export interface AdjustInput {
   qty_delta: number
   reason?: string | null
 }
+
+export type ReagentImportTemplateFormat = 'csv' | 'xlsx'
+
+export interface ReagentImportIssue {
+  row: number
+  field: string
+  message: string
+}
+
+export interface ReagentImportResult {
+  dry_run: boolean
+  total_rows: number
+  valid_rows: number
+  error_rows: number
+  created_reagents: number
+  matched_reagents: number
+  created_lots: number
+  errors: ReagentImportIssue[]
+  warnings: ReagentImportIssue[]
+}

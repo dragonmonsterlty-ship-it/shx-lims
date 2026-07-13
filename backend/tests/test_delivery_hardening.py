@@ -3,6 +3,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 from app.core.config import Settings
 from app.models.user import User
 from scripts import seed_demo
@@ -20,6 +22,14 @@ def test_settings_support_app_env_and_local_vite_origins(monkeypatch):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+
+def test_settings_reject_default_secret_outside_development(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("SECRET_KEY", "change-this-development-secret")
+
+    with pytest.raises(ValueError, match="SECRET_KEY must be changed"):
+        Settings(_env_file=None)
 
 
 def test_seed_demo_is_idempotent_and_uses_documented_accounts(db_session):

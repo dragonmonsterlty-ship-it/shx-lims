@@ -60,7 +60,7 @@ class UserStatusUpdate(BaseModel):
 
 
 class UserRoleUpdate(BaseModel):
-    role: str = Field(min_length=1, max_length=20)
+    role: str = Field(min_length=1, max_length=64)
 
 
 class UserPasswordReset(BaseModel):

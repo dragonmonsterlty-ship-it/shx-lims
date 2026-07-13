@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUserAllowPendingPassword, DbSession
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, LoginResponse, RefreshRequest, LogoutRequest, TokenResponse
 from app.schemas.common import api_response
 from app.schemas.user import UserRead
@@ -40,6 +40,10 @@ def logout(payload: LogoutRequest, db: DbSession) -> dict:
 
 
 @router.post("/change-password")
-def change_current_password(payload: ChangePasswordRequest, db: DbSession, current_user: CurrentUser) -> dict:
+def change_current_password(
+    payload: ChangePasswordRequest,
+    db: DbSession,
+    current_user: CurrentUserAllowPendingPassword,
+) -> dict:
     change_password(db, current_user, payload.old_password, payload.new_password)
     return api_response({"must_change_password": False}, message="Password changed")

@@ -1,10 +1,12 @@
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.audit import UserPasswordReset, UserRoleUpdate, UserStatusUpdate
+from app.schemas.user import AdminUserCreate
 from app.services.audit_logs import capture, record_audit
 from app.services.projects import is_admin
 
@@ -20,6 +22,44 @@ def ensure_admin_user(user: User) -> None:
 def list_admin_users(db: Session, current_user: User) -> list[User]:
     ensure_admin_user(current_user)
     return list(db.scalars(select(User).order_by(User.id)).all())
+
+
+def create_admin_user(db: Session, current_user: User, payload: AdminUserCreate) -> User:
+    ensure_admin_user(current_user)
+    if db.scalar(select(User.id).where(User.username == payload.username)) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+
+    user = User(
+        username=payload.username,
+        full_name=payload.display_name,
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+        is_active=payload.is_active,
+        must_change_password=True,
+    )
+    db.add(user)
+    try:
+        db.flush()
+        record_audit(
+            db,
+            current_user,
+            action="create",
+            entity_type="user",
+            entity_id=user.id,
+            target_user_id=user.id,
+            after_data={
+                "username": user.username,
+                "role": user.role,
+                "is_active": user.is_active,
+            },
+        )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already exists") from exc
+    db.refresh(user)
+    return user
 
 
 def _active_admin_count(db: Session) -> int:

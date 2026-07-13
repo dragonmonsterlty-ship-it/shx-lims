@@ -35,6 +35,18 @@ Copy-Item .env.example frontend\.env
 .\scripts\verify-fullstack.ps1
 ```
 
+## 内网试用部署
+
+在一台 Windows 电脑上向同一内网开放 LIMS 前端和 API：
+
+```powershell
+.\scripts\start-lan-demo.ps1 -HostIP 192.168.3.50
+```
+
+部署前提、防火墙配置、验证、常见错误和回滚步骤见
+[`docs/lan-deploy.md`](docs/lan-deploy.md)。PostgreSQL 保持仅部署机本地可访问，
+普通内网用户只需访问前端 `5173` 端口。
+
 ## API 模式
 
 - `frontend/.env` 的 `VITE_API_MODE=real` → 连真实后端(`VITE_API_BASE_URL`)。
@@ -46,6 +58,13 @@ Copy-Item .env.example frontend\.env
 中文名称分别为“系统管理员”/“主管”/“项目负责人”/“操作员”。演示账号使用规范用户名 `project_manager`；历史角色值 `pm` 仍可归一为 `project_manager`，但不再单独提供 `pm` 演示账号。
 
 需要重建干净、可重复的本地演示环境时，请使用受保护的 `.\scripts\seed-demo.ps1 -Force`。账号、数据摘要和按角色浏览器验收路径见 [`docs/demo-walkthrough.md`](docs/demo-walkthrough.md)。
+
+## 账号发放
+
+系统不开放自助注册，也不提供公开注册页。内网部署后的账号由系统管理员登录后，
+在“管理员管理”页面点击“添加账号”创建。管理员需设置用户名、显示名、初始密码、
+角色和启用状态；新账号首次登录后必须修改初始密码。非管理员无法看到用户管理入口，
+也无权调用管理员创建账号接口。
 
 ## 手动命令（不走脚本时）
 

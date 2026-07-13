@@ -46,6 +46,8 @@ export const endpoints = {
   },
   reagents: {
     root: '/reagents',
+    importTemplate: '/reagents/import-template',
+    importInventory: '/reagents/import',
     detail: (id: number) => `/reagents/${id}`,
     lots: '/reagent-lots',
     lot: (id: number) => `/reagent-lots/${id}`,

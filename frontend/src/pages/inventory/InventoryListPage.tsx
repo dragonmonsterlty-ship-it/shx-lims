@@ -1,4 +1,4 @@
-import { PlusOutlined } from '@ant-design/icons'
+import { ImportOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   PageContainer,
   ProTable,
@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ApiError } from '../../api/errors'
 import { USE_MOCK } from '../../api/runtime'
 import { useAuth } from '../../auth/useAuth'
-import { canManageInventory } from '../../auth/permissions'
+import { canImportInventory, canManageInventory } from '../../auth/permissions'
 import StatusTag from '../../components/StatusTag'
 import { SketchEmpty } from '../../components/sketch'
 import { CATEGORY_OPTIONS, categoryLabel } from '../../components/status'
@@ -20,6 +20,7 @@ import { inventoryService } from '../../services/inventory'
 import type { BatchStatus, InventoryRow, MaterialCategory } from '../../types'
 import { formatDate } from '../../utils/format'
 import { AdjustModal, InboundModal, NewBatchModal } from './InventoryModals'
+import ReagentImportModal from './ReagentImportModal'
 
 interface InventoryParams {
   material_code?: string
@@ -46,9 +47,11 @@ export default function InventoryListPage() {
   const { message } = App.useApp()
   const actionRef = useRef<ActionType>(null)
   const [loadError, setLoadError] = useState<string>()
+  const [importOpen, setImportOpen] = useState(false)
 
   if (!user) return null
   const canManage = canManageInventory(user.role)
+  const canImport = canImportInventory(user.role)
 
   const handleFreeze = async (row: InventoryRow) => {
     try {
@@ -155,21 +158,33 @@ export default function InventoryListPage() {
           }
         }}
         toolBarRender={() =>
-          USE_MOCK && canManage
+          canImport || (USE_MOCK && canManage)
             ? [
-                <NewBatchModal
-                  key="new"
-                  actorId={user.id}
-                  trigger={
-                    <Button type="primary" icon={<PlusOutlined />}>
-                      新增物料/批次
-                    </Button>
-                  }
-                  onSaved={() => actionRef.current?.reload()}
-                />,
+                !USE_MOCK && canImport ? (
+                  <Button key="import" icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+                    导入库存
+                  </Button>
+                ) : null,
+                USE_MOCK && canManage ? (
+                  <NewBatchModal
+                    key="new"
+                    actorId={user.id}
+                    trigger={
+                      <Button type="primary" icon={<PlusOutlined />}>
+                        新增物料/批次
+                      </Button>
+                    }
+                    onSaved={() => actionRef.current?.reload()}
+                  />
+                ) : null,
               ]
             : []
         }
+      />
+      <ReagentImportModal
+        open={importOpen}
+        onCancel={() => setImportOpen(false)}
+        onImported={() => actionRef.current?.reload()}
       />
     </PageContainer>
   )

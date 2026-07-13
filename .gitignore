@@ -10,8 +10,10 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.claude/settings.local.json*
 
 # 数据库 / 产物
 *.db
 *.sqlite
+storage/
 .DS_Store

@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi.responses import Response
 
 from app.core.deps import CurrentUser, DbSession
 from app.schemas.common import api_response
@@ -15,6 +16,7 @@ from app.schemas.reagent import (
     ReagentUpdate,
 )
 from app.services import reagents as reagent_service
+from app.services import reagent_import as reagent_import_service
 from app.services import experiment_records as experiment_record_service
 
 
@@ -52,6 +54,38 @@ def list_reagents(
     _ = current_user
     reagents = reagent_service.list_reagents(db, keyword=keyword, is_active=is_active, page=page, page_size=page_size)
     return paged_response(reagents, ReagentRead)
+
+
+@reagents_router.get("/import-template")
+def download_reagent_import_template(
+    current_user: CurrentUser,
+    format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
+) -> Response:
+    reagent_service.ensure_can_import_reagent_inventory(current_user)
+    content, media_type, filename = reagent_import_service.build_template(format)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@reagents_router.post("/import")
+async def import_reagent_inventory(
+    db: DbSession,
+    current_user: CurrentUser,
+    file: UploadFile = File(...),
+    dry_run: bool = Query(default=True),
+) -> dict:
+    content = await file.read(reagent_import_service.MAX_FILE_SIZE + 1)
+    result = reagent_import_service.import_reagents(
+        db,
+        current_user,
+        filename=file.filename,
+        content=content,
+        dry_run=dry_run,
+    )
+    return api_response(result)
 
 
 @reagents_router.get("/{reagent_id}")
