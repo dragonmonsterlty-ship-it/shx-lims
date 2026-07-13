@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.core.deps import CurrentUser, DbSession
 from app.schemas.audit import PasswordResetResult, UserPasswordReset, UserRoleUpdate, UserStatusUpdate
 from app.schemas.common import ApiResponse, api_response
-from app.schemas.user import AdminUserCreate, UserRead
+from app.schemas.user import AdminUserCreate, UserModulesUpdate, UserRead
 from app.services import admin_users as admin_user_service
 
 
@@ -31,6 +31,17 @@ def update_user_status(user_id: int, payload: UserStatusUpdate, db: DbSession, c
 @router.patch("/users/{user_id}/role", response_model=ApiResponse[UserRead])
 def update_user_role(user_id: int, payload: UserRoleUpdate, db: DbSession, current_user: CurrentUser) -> dict:
     user = admin_user_service.update_user_role(db, current_user, user_id, payload)
+    return api_response(UserRead.model_validate(user).model_dump())
+
+
+@router.patch("/users/{user_id}/modules", response_model=ApiResponse[UserRead])
+def update_user_modules(
+    user_id: int,
+    payload: UserModulesUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    user = admin_user_service.update_user_modules(db, current_user, user_id, payload)
     return api_response(UserRead.model_validate(user).model_dump())
 
 

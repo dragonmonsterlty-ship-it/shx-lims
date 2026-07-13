@@ -4,9 +4,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.core.modules import serialize_modules
 from app.models.user import User
 from app.schemas.audit import UserPasswordReset, UserRoleUpdate, UserStatusUpdate
-from app.schemas.user import AdminUserCreate
+from app.schemas.user import AdminUserCreate, UserModulesUpdate
 from app.services.audit_logs import capture, record_audit
 from app.services.projects import is_admin
 
@@ -35,6 +36,7 @@ def create_admin_user(db: Session, current_user: User, payload: AdminUserCreate)
         email=payload.email,
         password_hash=hash_password(payload.password),
         role=payload.role,
+        modules=serialize_modules(payload.modules),
         is_active=payload.is_active,
         must_change_password=True,
     )
@@ -52,6 +54,7 @@ def create_admin_user(db: Session, current_user: User, payload: AdminUserCreate)
                 "username": user.username,
                 "role": user.role,
                 "is_active": user.is_active,
+                "modules": payload.modules,
             },
         )
         db.commit()
@@ -60,6 +63,24 @@ def create_admin_user(db: Session, current_user: User, payload: AdminUserCreate)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already exists") from exc
     db.refresh(user)
     return user
+
+
+def update_user_modules(db: Session, current_user: User, user_id: int, payload: UserModulesUpdate) -> User:
+    ensure_admin_user(current_user)
+    target = get_target_user(db, user_id)
+    target.modules = serialize_modules(payload.modules)
+    record_audit(
+        db,
+        current_user,
+        action="update",
+        entity_type="user",
+        entity_id=target.id,
+        target_user_id=target.id,
+        after_data={"modules": payload.modules},
+    )
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 def _active_admin_count(db: Session) -> int:

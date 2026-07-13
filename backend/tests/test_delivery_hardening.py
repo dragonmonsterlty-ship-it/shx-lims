@@ -47,7 +47,9 @@ def test_seed_demo_is_idempotent_and_uses_documented_accounts(db_session):
         "researcher": {"role": "operator", "full_name": "Demo Researcher"},
         "operator": {"role": "operator", "full_name": "Demo Operator"},
         "analyst": {"role": "operator", "full_name": "Demo Analyst"},
+        "qc_operator": {"role": "operator", "full_name": "Demo QC Operator"},
     }
+    assert db_session.query(User).filter(User.username == "qc_operator").one().modules == "refstd"
 
 
 def test_seed_demo_deactivates_legacy_pm_account(db_session):
