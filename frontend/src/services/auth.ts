@@ -1,4 +1,4 @@
-import { normalizeRole } from '../api/adapters'
+import { normalizeModules, normalizeRole } from '../api/adapters'
 import { unwrap, USE_MOCK } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
@@ -16,9 +16,11 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
   const res = USE_MOCK
     ? unwrap(await mockServer.auth.login(req.username, req.password))
     : await request<LoginResponse>({ method: 'POST', url: endpoints.auth.login, data: req })
-  // real 模式下后端角色词表可能含 pm 等别名，归一到前端角色枚举，确保 RBAC 一致。
+  // real 模式下后端角色词表可能含 pm 等别名，归一到前端角色枚举，确保 RBAC 一致；
+  // modules 同步归一（admin 兜底为全部、非法/缺省兜底为 lims）。
   if (!USE_MOCK && res.user) {
-    res.user = { ...res.user, role: normalizeRole(res.user.role) }
+    const role = normalizeRole(res.user.role)
+    res.user = { ...res.user, role, modules: normalizeModules(res.user.modules, role) }
   }
   setStoredTokens({
     access_token: res.access_token,
@@ -48,7 +50,8 @@ export function getCurrentUser(): User | null {
 export async function fetchMe(userId: Id): Promise<User> {
   if (USE_MOCK) return unwrap(await mockServer.users.me(userId))
   const me = await request<User>({ method: 'GET', url: endpoints.users.me })
-  return { ...me, role: normalizeRole(me.role) }
+  const role = normalizeRole(me.role)
+  return { ...me, role, modules: normalizeModules(me.modules, role) }
 }
 
 export const authService = { login, logout, getCurrentUser, fetchMe }

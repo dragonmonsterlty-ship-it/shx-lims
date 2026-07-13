@@ -92,6 +92,8 @@ describe('AdminUsersPage create-account flow', () => {
     const user = userEvent.setup()
     await openCreateModal(user)
     expect(screen.getByRole('dialog', { name: '添加账号' })).toBeTruthy()
+    // 建号表单含"可访问模块"多选（默认 lims）。
+    expect(screen.getByLabelText('可访问模块')).toBeTruthy()
 
     await fillRequiredAccountFields(user)
     await user.type(screen.getByLabelText('邮箱'), 'new.operator@example.com')
@@ -104,6 +106,7 @@ describe('AdminUsersPage create-account flow', () => {
         email: 'new.operator@example.com',
         password: 'initial-pass-123',
         role: 'operator',
+        modules: ['lims'],
         is_active: true,
       })
     })

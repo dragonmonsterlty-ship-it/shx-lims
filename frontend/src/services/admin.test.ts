@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { request } from '../api/http'
+import type { ModuleKey } from '../types'
 import {
   createAdminUser,
   listAdminUsers,
   resetUserPassword,
+  updateUserModules,
   updateUserRole,
   updateUserStatus,
 } from './admin'
@@ -59,6 +61,26 @@ describe('admin service T1.6B contract', () => {
     })
   })
 
+  it('creates an admin-managed user with the modules field', async () => {
+    mockedRequest.mockResolvedValueOnce({})
+    const payload = {
+      username: 'qc_operator',
+      display_name: 'QC Operator',
+      password: 'initial-pass-123',
+      role: 'operator' as const,
+      modules: ['refstd'] as ModuleKey[],
+      is_active: true,
+    }
+
+    await createAdminUser(payload)
+
+    expect(mockedRequest).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/admin/users',
+      data: payload,
+    })
+  })
+
   it('updates user role through the role endpoint', async () => {
     mockedRequest.mockResolvedValueOnce({})
 
@@ -68,6 +90,18 @@ describe('admin service T1.6B contract', () => {
       method: 'PATCH',
       url: '/admin/users/5/role',
       data: { role: 'researcher' },
+    })
+  })
+
+  it('updates user modules through the modules endpoint', async () => {
+    mockedRequest.mockResolvedValueOnce({})
+
+    await updateUserModules(5, ['lims', 'refstd'])
+
+    expect(mockedRequest).toHaveBeenCalledWith({
+      method: 'PATCH',
+      url: '/admin/users/5/modules',
+      data: { modules: ['lims', 'refstd'] },
     })
   })
 
