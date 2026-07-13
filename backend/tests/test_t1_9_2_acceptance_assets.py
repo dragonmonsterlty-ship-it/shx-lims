@@ -34,5 +34,15 @@ def test_real_api_verifier_covers_admin_audit_and_three_entity_timelines():
         "`/audit-logs/entity/${entityType}/${entityId}`",
         "assertTimeline",
         "assertManagerAuditScope",
+        "`${item.entity_type}:${item.entity_id}`",
+        "`experiment:${crossExperiment.id}`",
+        "`daily_report:${crossReport.id}`",
+        "`sample:${crossSample.id}`",
     ]:
         assert marker in script
+
+
+def test_fullstack_verifier_propagates_real_api_failure():
+    script = (ROOT / "scripts" / "verify-fullstack.ps1").read_text(encoding="utf-8")
+
+    assert "Assert-NativeExitCode 'npm run verify:api' $LASTEXITCODE" in script
