@@ -57,13 +57,20 @@ Copy-Item .env.example frontend\.env
 标准角色为 `admin` / `director` / `project_manager` / `operator`。
 中文名称分别为“系统管理员”/“主管”/“项目负责人”/“操作员”。演示账号使用规范用户名 `project_manager`；历史角色值 `pm` 仍可归一为 `project_manager`，但不再单独提供 `pm` 演示账号。
 
+| 用户名 | 角色 | 可访问模块 |
+|---|---|---|
+| `admin` | admin | `lims`、`refstd`（管理员固定为全部模块） |
+| `project_manager` | project_manager | `lims` |
+| `analyst` / `operator` | operator | `lims` |
+| `qc_operator` | operator | 仅 `refstd` |
+
 需要重建干净、可重复的本地演示环境时，请使用受保护的 `.\scripts\seed-demo.ps1 -Force`。账号、数据摘要和按角色浏览器验收路径见 [`docs/demo-walkthrough.md`](docs/demo-walkthrough.md)。
 
 ## 账号发放
 
 系统不开放自助注册，也不提供公开注册页。内网部署后的账号由系统管理员登录后，
 在“管理员管理”页面点击“添加账号”创建。管理员需设置用户名、显示名、初始密码、
-角色和启用状态；新账号首次登录后必须修改初始密码。非管理员无法看到用户管理入口，
+角色、可访问模块和启用状态；新账号首次登录后必须修改初始密码。非管理员无法看到用户管理入口，
 也无权调用管理员创建账号接口。
 
 ## 手动命令（不走脚本时）

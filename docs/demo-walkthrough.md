@@ -35,12 +35,13 @@ Set-Location D:\vibecoding\lims-fullstack-mvp
 
 所有账号默认密码均为 `password123`。
 
-| 用户名 | 角色 | 用途 |
-|---|---|---|
-| `admin` | admin | 用户管理、全局审计与实体时间线 |
-| `project_manager` | project_manager | 管理项目 A/B，审核日报与检测结果 |
-| `analyst` | operator | 执行项目 A 中分配给自己的检测任务 |
-| `operator` | operator | 创建/查看项目 A 的实验和日报 |
+| 用户名 | 角色 | 可访问模块 | 用途 |
+|---|---|---|---|
+| `admin` | admin | `lims`、`refstd` | 用户管理、全局审计与实体时间线 |
+| `project_manager` | project_manager | `lims` | 管理项目 A/B，审核日报与检测结果 |
+| `analyst` | operator | `lims` | 执行项目 A 中分配给自己的检测任务 |
+| `operator` | operator | `lims` | 创建/查看项目 A 的实验和日报 |
+| `qc_operator` | operator | 仅 `refstd` | QC 对照品工作区演示账号 |
 
 项目 A 为 `MVP Demo Project A`，包含完整演示链。项目 B 为 `MVP Demo Project B`，仅项目负责人可访问，用于验证 analyst/operator 的跨项目隔离。
 
