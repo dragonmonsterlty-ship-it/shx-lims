@@ -18,6 +18,7 @@ from app.models.business import (
     InventoryTxn,
     Project,
     ProjectMember,
+    RefStandard,
     Reagent,
     ReagentLot,
     Result,
@@ -42,6 +43,8 @@ DATA_MODEL_TABLES = {
     "daily_log",
     "attachment",
     "audit_log",
+    "ref_standard",
+    "ref_standard_code_counter",
 }
 
 
@@ -83,6 +86,46 @@ def test_attachment_model_uses_t1_6a_canonical_contract():
     assert "file_name" not in attachment_columns
     assert "sha256" not in attachment_columns
     assert "content_type_detected" not in attachment_columns
+    assert Base.metadata.tables["attachment"].c.project_id.nullable is True
+
+
+def test_ref_standard_model_contract(db_session, create_user):
+    user = create_user(username="refstd_model", role="operator", modules="refstd", must_change_password=False)
+    table = Base.metadata.tables["ref_standard"]
+    assert {
+        "id",
+        "code",
+        "name",
+        "batch_no",
+        "source",
+        "spec",
+        "assigned_value",
+        "initial_amount",
+        "current_amount",
+        "unit",
+        "storage_condition",
+        "expires_at",
+        "status",
+        "notes",
+        "created_by",
+        "created_at",
+        "updated_at",
+        "is_deleted",
+    }.issubset(table.c.keys())
+
+    standard = RefStandard(
+        code="RS-2026-0001",
+        name="Reference A",
+        source="self_made",
+        initial_amount=Decimal("10.0000"),
+        current_amount=Decimal("10.0000"),
+        created_by=user.id,
+    )
+    db_session.add(standard)
+    db_session.commit()
+    db_session.refresh(standard)
+    assert standard.status == "in_stock"
+    assert standard.current_amount == Decimal("10.0000")
 
 
 def test_attachment_settings_default_to_local_storage_contract():

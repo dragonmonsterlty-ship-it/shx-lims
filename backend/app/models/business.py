@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -427,6 +427,51 @@ class InventoryTxn(Base):
     operator = relationship("User", foreign_keys=[operator_id])
 
 
+class RefStandardCodeCounter(Base):
+    __tablename__ = "ref_standard_code_counter"
+
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("last_value >= 0", name="ck_ref_standard_code_counter_nonnegative"),
+    )
+
+
+class RefStandard(AuditColumnsMixin, Base):
+    __tablename__ = "ref_standard"
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    batch_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    spec: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    assigned_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    initial_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    current_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    storage_condition: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    expires_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="in_stock", default="in_stock")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+
+    __table_args__ = (
+        CheckConstraint("source IN ('self_made', 'purchased')", name="ck_ref_standard_source"),
+        CheckConstraint("status IN ('in_stock', 'depleted', 'disposed')", name="ck_ref_standard_status"),
+        CheckConstraint("initial_amount > 0", name="ck_ref_standard_initial_amount_positive"),
+        CheckConstraint("current_amount >= 0", name="ck_ref_standard_current_amount_nonnegative"),
+        Index("idx_ref_standard_code", "code"),
+        Index("idx_ref_standard_name", "name"),
+        Index("idx_ref_standard_batch_no", "batch_no"),
+        Index("idx_ref_standard_source", "source"),
+        Index("idx_ref_standard_status", "status"),
+        Index("idx_ref_standard_expires_at", "expires_at"),
+        Index("idx_ref_standard_is_deleted", "is_deleted"),
+    )
+
+
 class DailyLog(AuditColumnsMixin, Base):
     __tablename__ = "daily_log"
 
@@ -457,7 +502,7 @@ class Attachment(Base):
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_id: Mapped[int] = mapped_column(BIGINT_ID, nullable=False)
-    project_id: Mapped[int] = mapped_column(BIGINT_ID, ForeignKey("project.id"), nullable=False)
+    project_id: Mapped[int | None] = mapped_column(BIGINT_ID, ForeignKey("project.id"), nullable=True)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
