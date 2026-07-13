@@ -1,4 +1,4 @@
-import type { UserRole } from './auth'
+import type { ModuleKey, UserRole } from './auth'
 
 export interface AdminUser {
   id: number
@@ -7,6 +7,7 @@ export interface AdminUser {
   email: string | null
   role: UserRole
   department: string | null
+  modules: ModuleKey[]
   is_active: boolean
   must_change_password: boolean
 }
@@ -17,6 +18,7 @@ export interface AdminUserCreate {
   email?: string
   password: string
   role: UserRole
+  modules?: ModuleKey[]
   is_active: boolean
 }
 
@@ -26,6 +28,10 @@ export interface UserStatusUpdate {
 
 export interface UserRoleUpdate {
   role: UserRole
+}
+
+export interface UserModulesUpdate {
+  modules: ModuleKey[]
 }
 
 export interface UserPasswordReset {

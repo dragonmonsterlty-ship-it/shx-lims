@@ -1,6 +1,12 @@
 import { endpoints } from '../api/endpoints'
 import { request } from '../api/http'
-import type { AdminUser, AdminUserCreate, PasswordResetResult, UserRole } from '../types'
+import type {
+  AdminUser,
+  AdminUserCreate,
+  ModuleKey,
+  PasswordResetResult,
+  UserRole,
+} from '../types'
 
 export function listAdminUsers(): Promise<AdminUser[]> {
   return request<AdminUser[]>({
@@ -33,6 +39,14 @@ export function updateUserRole(userId: number, role: UserRole): Promise<AdminUse
   })
 }
 
+export function updateUserModules(userId: number, modules: ModuleKey[]): Promise<AdminUser> {
+  return request<AdminUser>({
+    method: 'PATCH',
+    url: endpoints.adminUsers.modules(userId),
+    data: { modules },
+  })
+}
+
 export function resetUserPassword(
   userId: number,
   newPassword: string,
@@ -49,5 +63,6 @@ export const adminService = {
   createAdminUser,
   updateUserStatus,
   updateUserRole,
+  updateUserModules,
   resetUserPassword,
 }

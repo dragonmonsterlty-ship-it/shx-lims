@@ -7,6 +7,7 @@ import type {
   ExperimentInput,
   ExperimentMaterialUsage,
   Id,
+  ModuleKey,
   ReagentInput,
   InventoryBatch,
   InventoryRow,
@@ -46,6 +47,26 @@ export function normalizeRole(raw: string | null | undefined): Role {
   return ROLE_ALIASES[raw.toLowerCase()] ?? 'viewer'
 }
 
+const MODULE_KEYS: ModuleKey[] = ['lims', 'refstd']
+
+/**
+ * 后端 modules（逗号分隔字符串或数组）→ 前端模块枚举。
+ * admin 由后端保证返回全部；此处仅做取值与兜底：无值/非法归为 ["lims"]，
+ * 保持稳定顺序，避免把用户挡在门外。
+ */
+export function normalizeModules(
+  raw: string[] | string | null | undefined,
+  role?: Role,
+): ModuleKey[] {
+  if (role === 'admin') return [...MODULE_KEYS]
+  const list = typeof raw === 'string' ? raw.split(',') : (raw ?? [])
+  const valid = list
+    .map((m) => m.trim().toLowerCase())
+    .filter((m): m is ModuleKey => (MODULE_KEYS as string[]).includes(m))
+  const ordered = MODULE_KEYS.filter((key) => valid.includes(key))
+  return ordered.length > 0 ? ordered : ['lims']
+}
+
 export interface BackendUserBrief {
   id: Id
   name?: string
@@ -54,6 +75,7 @@ export interface BackendUserBrief {
   role: string
   email?: string | null
   department?: string | null
+  modules?: string[] | null
   is_active?: boolean
   must_change_password?: boolean
 }
@@ -293,13 +315,15 @@ const toNumber = (value: number | string | null | undefined): number =>
   value == null ? 0 : Number(value)
 
 export function adaptUser(raw: BackendUserBrief): User {
+  const role = normalizeRole(raw.role)
   return {
     id: raw.id,
     username: raw.username,
     full_name: raw.full_name ?? raw.name ?? raw.username,
     email: raw.email ?? null,
-    role: normalizeRole(raw.role),
+    role,
     department: raw.department ?? null,
+    modules: normalizeModules(raw.modules, role),
     is_active: raw.is_active ?? true,
     must_change_password: raw.must_change_password ?? false,
   }

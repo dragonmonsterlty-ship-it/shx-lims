@@ -9,16 +9,18 @@ import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag
 import { useRef, useState } from 'react'
 
 import type { ApiError } from '../../api/errors'
+import { MODULE_OPTIONS, effectiveModules, moduleLabel } from '../../auth/modules'
 import { roleLabel } from '../../auth/permissions'
 import { SketchEmpty } from '../../components/sketch'
 import {
   createAdminUser,
   listAdminUsers,
   resetUserPassword,
+  updateUserModules,
   updateUserRole,
   updateUserStatus,
 } from '../../services/admin'
-import type { AdminUser, AdminUserCreate, UserRole } from '../../types'
+import type { AdminUser, AdminUserCreate, ModuleKey, UserRole } from '../../types'
 
 const ROLE_OPTIONS: { label: string; value: UserRole }[] = (
   ['admin', 'director', 'project_manager', 'researcher', 'operator', 'viewer'] as UserRole[]
@@ -26,6 +28,10 @@ const ROLE_OPTIONS: { label: string; value: UserRole }[] = (
 
 interface ResetPasswordForm {
   new_password: string
+}
+
+interface ModulesForm {
+  modules: ModuleKey[]
 }
 
 type CreateAccountForm = AdminUserCreate
@@ -37,8 +43,11 @@ export default function AdminUsersPage() {
   const [creating, setCreating] = useState(false)
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
   const [resetting, setResetting] = useState(false)
+  const [modulesTarget, setModulesTarget] = useState<AdminUser | null>(null)
+  const [savingModules, setSavingModules] = useState(false)
   const [createForm] = Form.useForm<CreateAccountForm>()
   const [resetForm] = Form.useForm<ResetPasswordForm>()
+  const [modulesForm] = Form.useForm<ModulesForm>()
 
   const reload = () => actionRef.current?.reload()
   const showError = (error: unknown, fallback: string) => {
@@ -125,6 +134,32 @@ export default function AdminUsersPage() {
     }
   }
 
+  const openModulesModal = (user: AdminUser) => {
+    setModulesTarget(user)
+    modulesForm.setFieldsValue({ modules: effectiveModules(user) })
+  }
+
+  const submitModules = async ({ modules }: ModulesForm) => {
+    if (!modulesTarget) return
+    setSavingModules(true)
+    try {
+      await updateUserModules(modulesTarget.id, modules)
+      message.success('可访问模块已更新')
+      setModulesTarget(null)
+      modulesForm.resetFields()
+      reload()
+    } catch (error) {
+      const apiError = error as ApiError
+      if (apiError.status === 403) {
+        message.error('权限不足，仅系统管理员可以修改模块')
+      } else {
+        message.error(apiError.message || '模块修改失败')
+      }
+    } finally {
+      setSavingModules(false)
+    }
+  }
+
   const columns: ProColumns<AdminUser>[] = [
     { title: '用户名', dataIndex: 'username', width: 140, copyable: true },
     { title: '姓名', dataIndex: 'full_name', width: 140 },
@@ -150,6 +185,20 @@ export default function AdminUsersPage() {
       renderText: (value) => value || '—',
     },
     {
+      title: '可访问模块',
+      dataIndex: 'modules',
+      width: 200,
+      render: (_, user) => (
+        <Space size={4} wrap>
+          {effectiveModules(user).map((module) => (
+            <Tag key={module} color={module === 'refstd' ? 'purple' : 'geekblue'}>
+              {moduleLabel[module]}
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
       title: '状态',
       dataIndex: 'is_active',
       width: 90,
@@ -166,7 +215,7 @@ export default function AdminUsersPage() {
     {
       title: '操作',
       valueType: 'option',
-      width: 190,
+      width: 260,
       fixed: 'right',
       render: (_, user) => (
         <Space>
@@ -186,6 +235,9 @@ export default function AdminUsersPage() {
           >
             <a>{user.is_active ? '禁用' : '启用'}</a>
           </Popconfirm>
+          <Button type="link" size="small" onClick={() => openModulesModal(user)}>
+            修改模块
+          </Button>
           <Button
             type="link"
             size="small"
@@ -224,7 +276,7 @@ export default function AdminUsersPage() {
         ]}
         pagination={false}
         options={{ density: true, reload: true, setting: true }}
-        scroll={{ x: 1120 }}
+        scroll={{ x: 1360 }}
         locale={{ emptyText: <SketchEmpty description="暂无用户" /> }}
         request={async () => {
           try {
@@ -249,7 +301,7 @@ export default function AdminUsersPage() {
         <Form<CreateAccountForm>
           form={createForm}
           layout="vertical"
-          initialValues={{ is_active: true }}
+          initialValues={{ is_active: true, modules: ['lims'] }}
           onFinish={submitCreateAccount}
         >
           <Form.Item
@@ -296,6 +348,18 @@ export default function AdminUsersPage() {
           >
             <Select<UserRole> options={ROLE_OPTIONS} placeholder="请选择角色" />
           </Form.Item>
+          <Form.Item
+            name="modules"
+            label="可访问模块"
+            tooltip="决定该用户可进入哪些工作区；系统管理员默认拥有全部模块。"
+            rules={[{ required: true, message: '请至少选择一个模块' }]}
+          >
+            <Select<ModuleKey[]>
+              mode="multiple"
+              options={MODULE_OPTIONS}
+              placeholder="请选择可访问模块"
+            />
+          </Form.Item>
           <Form.Item name="is_active" label="是否启用" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
@@ -325,6 +389,35 @@ export default function AdminUsersPage() {
             ]}
           >
             <Input.Password autoComplete="new-password" placeholder="至少 8 位" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`修改可访问模块${modulesTarget ? `：${modulesTarget.full_name}` : ''}`}
+        open={!!modulesTarget}
+        confirmLoading={savingModules}
+        okText="保存"
+        cancelText="取消"
+        onOk={() => modulesForm.submit()}
+        onCancel={() => {
+          setModulesTarget(null)
+          modulesForm.resetFields()
+        }}
+        destroyOnHidden
+      >
+        <Form form={modulesForm} layout="vertical" onFinish={submitModules}>
+          <Form.Item
+            name="modules"
+            label="可访问模块"
+            tooltip="系统管理员默认拥有全部模块，修改对其不生效。"
+            rules={[{ required: true, message: '请至少选择一个模块' }]}
+          >
+            <Select<ModuleKey[]>
+              mode="multiple"
+              options={MODULE_OPTIONS}
+              placeholder="请选择可访问模块"
+            />
           </Form.Item>
         </Form>
       </Modal>

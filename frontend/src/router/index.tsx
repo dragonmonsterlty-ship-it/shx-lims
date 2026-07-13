@@ -3,11 +3,14 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import AppLayout from '../layouts/AppLayout'
+import RefStdLayout from '../layouts/RefStdLayout'
+import ModuleGuard from './ModuleGuard'
 import RequireAuth from './RequireAuth'
 import RoleGuard from './RoleGuard'
 
 // 路由级懒加载：按页面拆分代码，减小首屏 bundle。
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'))
+const PortalPage = lazy(() => import('../pages/portal/PortalPage'))
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'))
 const ProjectListPage = lazy(() => import('../pages/projects/ProjectListPage'))
 const ProjectDetailPage = lazy(() => import('../pages/projects/ProjectDetailPage'))
@@ -22,6 +25,7 @@ const SampleDetailPage = lazy(() => import('../pages/samples/SampleDetailPage'))
 const TestingReviewPage = lazy(() => import('../pages/testing/TestingReviewPage'))
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'))
 const AuditLogPage = lazy(() => import('../pages/audit/AuditLogPage'))
+const RefStandardListPage = lazy(() => import('../pages/refStandards/RefStandardListPage'))
 const ForbiddenPage = lazy(() => import('../pages/error/ForbiddenPage'))
 const NotFoundPage = lazy(() => import('../pages/error/NotFoundPage'))
 
@@ -34,10 +38,22 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      { index: true, element: <Navigate to="/portal" replace /> },
+      { path: 'portal', element: withSuspense(<PortalPage />) },
+      {
+        element: <ModuleGuard module="refstd" />,
+        children: [
+          {
+            element: <RefStdLayout />,
+            children: [
+              { path: 'ref-standards', element: withSuspense(<RefStandardListPage />) },
+            ],
+          },
+        ],
+      },
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: 'dashboard', element: withSuspense(<DashboardPage />) },
           { path: 'projects', element: withSuspense(<ProjectListPage />) },
           { path: 'projects/:id', element: withSuspense(<ProjectDetailPage />) },

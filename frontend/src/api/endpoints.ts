@@ -22,6 +22,7 @@ export const endpoints = {
     root: '/admin/users',
     status: (userId: number) => `/admin/users/${userId}/status`,
     role: (userId: number) => `/admin/users/${userId}/role`,
+    modules: (userId: number) => `/admin/users/${userId}/modules`,
     resetPassword: (userId: number) => `/admin/users/${userId}/reset-password`,
   },
   projects: {

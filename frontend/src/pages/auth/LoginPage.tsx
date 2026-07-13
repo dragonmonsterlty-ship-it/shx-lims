@@ -71,7 +71,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm<LoginValues>()
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+  const from = (location.state as { from?: string } | null)?.from ?? '/portal'
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />
@@ -154,6 +154,7 @@ export default function LoginPage() {
                   { u: 'director', label: '主管' },
                   { u: 'project_manager', label: '项目负责人' },
                   { u: 'op', label: '操作员' },
+                  { u: 'qc', label: 'QC 质检' },
                 ]
               : [
                   { u: 'director', label: '主管' },
