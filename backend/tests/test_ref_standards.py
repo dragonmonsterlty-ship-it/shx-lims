@@ -12,6 +12,7 @@ from app.models.business import AuditLog, RefStandard
 from app.models.user import User
 from app.schemas.ref_standard import RefStandardCreate
 from app.services import ref_standards as ref_standard_service
+from app.services.storage import LocalAttachmentStorage
 
 
 def auth_headers(client, username: str, password: str = "password123") -> dict[str, str]:
@@ -127,7 +128,10 @@ def test_duplicate_code_and_payload_validation_return_expected_errors(client, cr
         create_payload(source="other"),
         create_payload(initial_amount="0"),
         create_payload(initial_amount="-1"),
+        create_payload(initial_amount="1.00001"),
         create_payload(code="   "),
+        create_payload(current_amount="12.3400"),
+        create_payload(status="in_stock"),
     ):
         response = client.post("/api/ref-standards", headers=headers, json=payload)
         assert response.status_code == 422, response.text
@@ -161,6 +165,23 @@ def test_module_and_viewer_permissions_cover_all_ledger_routes(client, create_us
     )
     assert client.post(f"/api/ref-standards/{standard_id}/dispose", headers=viewer_headers).status_code == 403
     assert users["admin"].modules == "lims"
+
+
+def test_missing_ref_standard_returns_404_for_detail_update_and_dispose(client, create_user):
+    setup_users(create_user)
+    headers = auth_headers(client, "refstd_writer")
+    responses = (
+        client.get("/api/ref-standards/999999", headers=headers),
+        client.patch("/api/ref-standards/999999", headers=headers, json={"notes": "missing"}),
+        client.post("/api/ref-standards/999999/dispose", headers=headers),
+    )
+    for response in responses:
+        assert response.status_code == 404
+        assert response.json() == {
+            "code": 404,
+            "message": "Reference standard not found",
+            "data": None,
+        }
 
 
 def test_list_filters_pagination_and_soft_delete_exclusion(client, create_user, db_session):
@@ -309,3 +330,124 @@ def test_atomic_counter_generates_unique_codes_concurrently(tmp_path, monkeypatc
 
     assert len(set(codes)) == 8
     assert sorted(codes) == [f"RS-2032-{value:04d}" for value in range(1, 9)]
+
+
+def test_ref_standard_attachments_reuse_upload_download_delete_permissions_and_audit(
+    client,
+    create_user,
+    db_session,
+    tmp_path,
+    monkeypatch,
+):
+    setup_users(create_user)
+    writer_headers = auth_headers(client, "refstd_writer")
+    viewer_headers = auth_headers(client, "refstd_viewer")
+    no_module_headers = auth_headers(client, "refstd_no_module")
+    storage = LocalAttachmentStorage(tmp_path)
+    monkeypatch.setattr("app.services.attachments.get_attachment_storage", lambda: storage)
+
+    standard_id = client.post(
+        "/api/ref-standards",
+        headers=writer_headers,
+        json=create_payload(code="ATTACH-001"),
+    ).json()["data"]["id"]
+
+    files = (
+        ("coa.pdf", b"%PDF-1.4\ncoa", "application/pdf"),
+        ("calibration-report.pdf", b"%PDF-1.4\ncalibration", "application/pdf"),
+        ("spectrum.png", b"\x89PNG\r\n\x1a\nimage", "image/png"),
+    )
+    attachment_ids = []
+    for filename, content, content_type in files:
+        response = client.post(
+            "/api/attachments",
+            headers=writer_headers,
+            data={"entity_type": "ref_standard", "entity_id": str(standard_id)},
+            files={"file": (filename, content, content_type)},
+        )
+        assert response.status_code == 201, response.text
+        attachment = response.json()["data"]
+        assert attachment["entity_type"] == "ref_standard"
+        assert attachment["entity_id"] == standard_id
+        assert attachment["project_id"] is None
+        assert attachment["original_filename"] == filename
+        attachment_ids.append(attachment["id"])
+
+    listed = client.get(
+        "/api/attachments",
+        headers=viewer_headers,
+        params={"entity_type": "ref_standard", "entity_id": standard_id},
+    )
+    assert listed.status_code == 200, listed.text
+    assert [item["original_filename"] for item in listed.json()["data"]] == [item[0] for item in files]
+
+    downloaded = client.get(f"/api/attachments/{attachment_ids[0]}/download", headers=viewer_headers)
+    assert downloaded.status_code == 200
+    assert downloaded.content == files[0][1]
+    assert "coa.pdf" in downloaded.headers["content-disposition"]
+
+    denied_upload = client.post(
+        "/api/attachments",
+        headers=viewer_headers,
+        data={"entity_type": "ref_standard", "entity_id": str(standard_id)},
+        files={"file": ("viewer.pdf", b"%PDF-1.4\nviewer", "application/pdf")},
+    )
+    assert denied_upload.status_code == 403
+    assert client.delete(f"/api/attachments/{attachment_ids[0]}", headers=viewer_headers).status_code == 403
+    assert (
+        client.get(
+            "/api/attachments",
+            headers=no_module_headers,
+            params={"entity_type": "ref_standard", "entity_id": standard_id},
+        ).status_code
+        == 403
+    )
+
+    deleted = client.delete(f"/api/attachments/{attachment_ids[0]}", headers=writer_headers)
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["data"] == {"id": attachment_ids[0], "deleted": True}
+    assert client.get(f"/api/attachments/{attachment_ids[0]}/download", headers=writer_headers).status_code == 404
+
+    actions = list(
+        db_session.scalars(
+            select(AuditLog.action)
+            .where(AuditLog.entity_type == "attachment", AuditLog.entity_id.in_(attachment_ids))
+            .order_by(AuditLog.id)
+        ).all()
+    )
+    assert actions == ["upload", "upload", "upload", "download", "delete"]
+
+
+def test_disposed_or_soft_deleted_ref_standard_blocks_attachment_writes_and_resolution(
+    client,
+    create_user,
+    db_session,
+    tmp_path,
+    monkeypatch,
+):
+    setup_users(create_user)
+    headers = auth_headers(client, "refstd_writer")
+    storage = LocalAttachmentStorage(tmp_path)
+    monkeypatch.setattr("app.services.attachments.get_attachment_storage", lambda: storage)
+    standard_id = client.post(
+        "/api/ref-standards", headers=headers, json=create_payload(code="ATTACH-STATE-001")
+    ).json()["data"]["id"]
+
+    assert client.post(f"/api/ref-standards/{standard_id}/dispose", headers=headers).status_code == 200
+    disposed_upload = client.post(
+        "/api/attachments",
+        headers=headers,
+        data={"entity_type": "ref_standard", "entity_id": str(standard_id)},
+        files={"file": ("disposed.pdf", b"%PDF-1.4\ndisposed", "application/pdf")},
+    )
+    assert disposed_upload.status_code == 422
+
+    standard = db_session.get(RefStandard, standard_id)
+    standard.is_deleted = True
+    db_session.commit()
+    hidden = client.get(
+        "/api/attachments",
+        headers=headers,
+        params={"entity_type": "ref_standard", "entity_id": standard_id},
+    )
+    assert hidden.status_code == 404

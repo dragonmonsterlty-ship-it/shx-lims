@@ -278,3 +278,107 @@ def test_user_modules_migration_backfills_existing_users(tmp_path):
     finally:
         engine.dispose()
     assert modules == "lims"
+
+
+def test_ref_standard_migration_upgrades_legacy_database_and_round_trips(tmp_path):
+    db_path = tmp_path / "ref-standard-migration.db"
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{db_path.as_posix()}"
+    env.setdefault("SECRET_KEY", "test-secret-key-that-is-long-enough")
+    backend_dir = Path(__file__).resolve().parents[1]
+
+    def run_alembic(*args: str) -> None:
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", *args],
+            cwd=backend_dir,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+
+    run_alembic("upgrade", "202607130001")
+
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                'INSERT INTO "user" '
+                "(id, username, full_name, password_hash, role, modules, is_active, must_change_password) "
+                "VALUES (1, 'legacy-refstd', 'Legacy Refstd', 'hash', 'operator', 'refstd', 1, 0)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO project (id, project_code, name, created_by) "
+                "VALUES (1, 'LEGACY-P', 'Legacy Project', 1)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO attachment "
+                "(id, entity_type, entity_id, project_id, original_filename, storage_key, content_type, "
+                "file_size, checksum_sha256, storage_backend, uploaded_by) "
+                "VALUES (1, 'sample', 1, 1, 'legacy.pdf', 'legacy-key', 'application/pdf', 3, :checksum, 'local', 1)"
+            ),
+            {"checksum": "a" * 64},
+        )
+    engine.dispose()
+
+    run_alembic("upgrade", "head")
+    engine = create_engine(env["DATABASE_URL"])
+    try:
+        inspector = inspect(engine)
+        assert {"ref_standard", "ref_standard_code_counter"}.issubset(inspector.get_table_names())
+        project_id_column = next(
+            column for column in inspector.get_columns("attachment") if column["name"] == "project_id"
+        )
+        assert project_id_column["nullable"] is True
+        with engine.begin() as connection:
+            assert connection.execute(text("SELECT original_filename FROM attachment WHERE id = 1")).scalar_one() == "legacy.pdf"
+            connection.execute(
+                text(
+                    "INSERT INTO ref_standard "
+                    "(id, code, name, source, initial_amount, current_amount, status, created_by) "
+                    "VALUES (1, 'RS-2030-0001', 'Migrated Standard', 'self_made', 1, 1, 'in_stock', 1)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO attachment "
+                    "(id, entity_type, entity_id, project_id, original_filename, storage_key, content_type, "
+                    "file_size, checksum_sha256, storage_backend, uploaded_by) "
+                    "VALUES (2, 'ref_standard', 1, NULL, 'coa.pdf', 'coa-key', 'application/pdf', 3, :checksum, 'local', 1)"
+                ),
+                {"checksum": "b" * 64},
+            )
+    finally:
+        engine.dispose()
+
+    run_alembic("downgrade", "202607130001")
+    engine = create_engine(env["DATABASE_URL"])
+    try:
+        inspector = inspect(engine)
+        assert "ref_standard" not in inspector.get_table_names()
+        assert "ref_standard_code_counter" not in inspector.get_table_names()
+        project_id_column = next(
+            column for column in inspector.get_columns("attachment") if column["name"] == "project_id"
+        )
+        assert project_id_column["nullable"] is False
+        with engine.connect() as connection:
+            attachments = connection.execute(text("SELECT id, entity_type FROM attachment ORDER BY id")).all()
+        assert attachments == [(1, "sample")]
+    finally:
+        engine.dispose()
+
+    run_alembic("upgrade", "head")
+    engine = create_engine(env["DATABASE_URL"])
+    try:
+        assert {"ref_standard", "ref_standard_code_counter"}.issubset(inspect(engine).get_table_names())
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT original_filename FROM attachment WHERE id = 1")).scalar_one() == "legacy.pdf"
+    finally:
+        engine.dispose()

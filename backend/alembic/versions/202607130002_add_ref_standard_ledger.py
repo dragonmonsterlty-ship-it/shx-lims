@@ -68,6 +68,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(sa.text("DELETE FROM attachment WHERE entity_type = 'ref_standard'"))
     with op.batch_alter_table("attachment") as batch_op:
         batch_op.alter_column("project_id", existing_type=sa.BigInteger(), nullable=False)
 

@@ -12,10 +12,10 @@ from app.services import daily_reports, experiment_records, testing
 from app.services.projects import is_admin, is_director, is_project_manager, is_project_member
 
 
-AttachmentEntityType = Literal["experiment", "daily_report", "sample", "test_task", "test_result"]
+AttachmentEntityType = Literal["experiment", "daily_report", "sample", "test_task", "test_result", "ref_standard"]
 AttachmentAction = Literal["read", "upload", "delete"]
 
-ENTITY_TYPES = {"experiment", "daily_report", "sample", "test_task", "test_result"}
+ENTITY_TYPES = {"experiment", "daily_report", "sample", "test_task", "test_result", "ref_standard"}
 ACTIONS = {"read", "upload", "delete"}
 DAILY_REPORT_PROJECT_ERROR = "Daily report attachments require exactly one linked project."
 
@@ -24,7 +24,7 @@ DAILY_REPORT_PROJECT_ERROR = "Daily report attachments require exactly one linke
 class ResolvedAttachmentEntity:
     entity_type: AttachmentEntityType
     entity_id: int
-    project_id: int
+    project_id: int | None
     object: object
     editable: bool
 
@@ -50,7 +50,26 @@ def resolve_attachment_entity(
         return _resolve_sample(db, current_user, entity_id, action)
     if entity_type == "test_task":
         return _resolve_task(db, current_user, entity_id, action)
+    if entity_type == "ref_standard":
+        return _resolve_ref_standard(db, current_user, entity_id, action)
     return _resolve_result(db, current_user, entity_id, action)
+
+
+def _resolve_ref_standard(
+    db: Session, current_user: User, entity_id: int, action: str
+) -> ResolvedAttachmentEntity:
+    from app.services import ref_standards
+
+    standard = ref_standards.read_ref_standard(db, current_user, entity_id)
+    editable = standard.status != "disposed"
+    if action != "read":
+        ref_standards.ensure_can_write_ref_standards(current_user)
+        if not editable:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Disposed reference standard does not allow attachment changes",
+            )
+    return ResolvedAttachmentEntity("ref_standard", standard.id, None, standard, editable)
 
 
 def _deny_director_write(current_user: User, action: str) -> None:

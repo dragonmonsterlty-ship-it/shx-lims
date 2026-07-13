@@ -12,6 +12,7 @@ class AttachmentEntityType(StrEnum):
     sample = "sample"
     test_task = "test_task"
     test_result = "test_result"
+    ref_standard = "ref_standard"
 
 
 class AttachmentRead(BaseModel):
@@ -20,7 +21,7 @@ class AttachmentRead(BaseModel):
     id: int
     entity_type: AttachmentEntityType
     entity_id: int
-    project_id: int
+    project_id: int | None = None
     original_filename: str
     storage_key: str
     content_type: str
